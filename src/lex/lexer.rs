@@ -1,6 +1,8 @@
 use core::fmt;
 
-#[derive(Debug)]
+use crate::lex::error::TokenError;
+
+#[derive(Debug, PartialEq, PartialOrd)]
 pub enum TokenType {
     // Single-character tokens.
     LeftParen,
@@ -51,7 +53,7 @@ pub enum TokenType {
     EOF,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, PartialOrd)]
 pub struct Token<'a> {
     kind: TokenType,
     lexeme: &'a str,
@@ -114,6 +116,9 @@ impl<'a> fmt::Display for Token<'a> {
 struct Scanner<'a> {
     source: &'a str,
     tokens: Vec<Token<'a>>,
+    start: u32,
+    current: u32,
+    line: u32,
 }
 
 impl<'a> Scanner<'a> {
@@ -121,6 +126,55 @@ impl<'a> Scanner<'a> {
         Self {
             source,
             tokens: vec![],
+            start: 0,
+            current: 0,
+            line: 1,
         }
+    }
+}
+
+impl<'a> Iterator for Scanner<'a> {
+    type Item = Result<Token<'a>, TokenError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.source = self.source.trim();
+        let mut chars_iter = self.source.chars();
+        let c = chars_iter.next()?;
+        let c_str = &self.source[..c.len_utf8()];
+        self.current += 1;
+        self.source = chars_iter.as_str();
+
+        let start = match c {
+            '(' => TokenType::LeftParen,
+            ')' => TokenType::RightParen,
+            '{' => TokenType::LeftBrace,
+            '}' => TokenType::RightBrace,
+            ',' => TokenType::Comma,
+            '.' => TokenType::Dot,
+            '-' => TokenType::Minus,
+            '+' => TokenType::Plus,
+            ';' => TokenType::Semicolon,
+            '*' => TokenType::Star,
+            // '\n' => self.line += 1,
+            _ => unimplemented!(),
+        };
+
+        Some(Ok(Token::new(start, c_str, self.line)))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn paren() {
+        let input = " ( ( )";
+        let mut scanner = Scanner::new(input);
+        let mut token = Token::new(TokenType::LeftParen, "(", 1);
+        assert_eq!(token, scanner.next().unwrap().unwrap());
+        assert_eq!(token, scanner.next().unwrap().unwrap());
+        token = Token::new(TokenType::RightParen, ")", 1);
+        assert_eq!(token, scanner.next().unwrap().unwrap());
     }
 }
