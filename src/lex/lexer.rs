@@ -1,7 +1,5 @@
 use core::fmt;
 
-use crate::lex::error::TokenError;
-
 #[derive(Debug, PartialEq, PartialOrd)]
 pub enum TokenType {
     // Single-character tokens.
@@ -54,15 +52,27 @@ pub enum TokenType {
 }
 
 #[derive(Debug, PartialEq, PartialOrd)]
+pub struct Span {
+    begin: u32,
+    end: u32,
+}
+
+#[derive(Debug, PartialEq, PartialOrd)]
 pub struct Token<'a> {
     kind: TokenType,
     lexeme: &'a str,
     line: u32,
+    span: Span,
 }
 
 impl<'a> Token<'a> {
-    pub fn new(kind: TokenType, lexeme: &'a str, line: u32) -> Self {
-        Self { kind, lexeme, line }
+    pub fn new(kind: TokenType, lexeme: &'a str, line: u32, span: Span) -> Self {
+        Self {
+            kind,
+            lexeme,
+            line,
+            span,
+        }
     }
 }
 
@@ -115,9 +125,8 @@ impl<'a> fmt::Display for Token<'a> {
 
 struct Scanner<'a> {
     source: &'a str,
-    tokens: Vec<Token<'a>>,
-    start: u32,
-    current: u32,
+    position: usize,
+    start: usize,
     line: u32,
 }
 
@@ -125,41 +134,60 @@ impl<'a> Scanner<'a> {
     pub fn new(source: &'a str) -> Self {
         Self {
             source,
-            tokens: vec![],
+            position: 0,
             start: 0,
-            current: 0,
             line: 1,
         }
     }
-}
 
-impl<'a> Iterator for Scanner<'a> {
-    type Item = Result<Token<'a>, TokenError>;
+    fn peek(&self) -> Option<char> {
+        self.source[self.position..].chars().next()
+    }
 
-    fn next(&mut self) -> Option<Self::Item> {
-        self.source = self.source.trim();
-        let mut chars_iter = self.source.chars();
-        let c = chars_iter.next()?;
-        let c_str = &self.source[..c.len_utf8()];
-        self.current += 1;
-        self.source = chars_iter.as_str();
+    fn read_char(&mut self) -> Option<char> {
+        if self.position < self.source.len() {
+            let c = self.peek()?;
+            self.position += c.len_utf8();
+            Some(c)
+        } else {
+            None
+        }
+    }
 
-        let start = match c {
-            '(' => TokenType::LeftParen,
-            ')' => TokenType::RightParen,
-            '{' => TokenType::LeftBrace,
-            '}' => TokenType::RightBrace,
-            ',' => TokenType::Comma,
-            '.' => TokenType::Dot,
-            '-' => TokenType::Minus,
-            '+' => TokenType::Plus,
-            ';' => TokenType::Semicolon,
-            '*' => TokenType::Star,
-            // '\n' => self.line += 1,
-            _ => unimplemented!(),
+    fn skip_whitespace(&mut self) {
+        while let Some(c) = self.peek() {
+            if c.is_whitespace() {
+                self.read_char();
+            } else {
+                break;
+            }
+        }
+    }
+
+    fn make_token(&self, kind: TokenType) -> Token<'a> {
+        let lexeme = &self.source[self.start..self.position];
+        Token::new(
+            kind,
+            lexeme,
+            self.line,
+            Span {
+                begin: self.start as u32,
+                end: self.position as u32,
+            },
+        )
+    }
+
+    pub fn next(&mut self) -> Option<Token<'a>> {
+        self.skip_whitespace();
+        self.start = self.position;
+
+        let c = self.read_char()?;
+        let token = match c {
+            '(' => self.make_token(TokenType::LeftParen),
+            _ => self.make_token(TokenType::EOF),
         };
 
-        Some(Ok(Token::new(start, c_str, self.line)))
+        Some(token)
     }
 }
 
@@ -168,13 +196,32 @@ mod test {
     use super::*;
 
     #[test]
-    fn paren() {
-        let input = " ( ( )";
+    fn peek() {
+        let input = "(";
+        let scanner = Scanner::new(input);
+        assert_eq!(scanner.peek().unwrap(), '(');
+    }
+
+    #[test]
+    fn whitespace() {
+        let input = "  (";
         let mut scanner = Scanner::new(input);
-        let mut token = Token::new(TokenType::LeftParen, "(", 1);
-        assert_eq!(token, scanner.next().unwrap().unwrap());
-        assert_eq!(token, scanner.next().unwrap().unwrap());
-        token = Token::new(TokenType::RightParen, ")", 1);
-        assert_eq!(token, scanner.next().unwrap().unwrap());
+        scanner.skip_whitespace();
+        assert_eq!(scanner.peek().unwrap(), '(');
+    }
+
+    #[test]
+    fn read_char() {
+        let input = "(";
+        let mut scanner = Scanner::new(input);
+        assert_eq!(scanner.read_char().unwrap(), '(');
+    }
+
+    #[test]
+    fn paren() {
+        let input = "(";
+        let mut scanner = Scanner::new(input);
+        let token = Token::new(TokenType::LeftParen, "(", 1, Span { begin: 0, end: 1 });
+        assert_eq!(token, scanner.next().unwrap());
     }
 }

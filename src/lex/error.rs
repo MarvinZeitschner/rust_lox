@@ -1,7 +1,7 @@
 use core::fmt;
 use std::error::Error;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, PartialOrd)]
 pub enum TokenError {}
 
 impl Error for TokenError {}
