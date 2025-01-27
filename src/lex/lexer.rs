@@ -292,10 +292,35 @@ impl<'a> Scanner<'a> {
                 };
                 self.make_token(token)
             }
-            '0'..='9' => self.number(),
+            '=' => {
+                let token = if self.match_next('=') {
+                    TokenType::EqualEqual
+                } else {
+                    TokenType::Equal
+                };
+                self.make_token(token)
+            }
+            '<' => {
+                let token = if self.match_next('=') {
+                    TokenType::LessEqual
+                } else {
+                    TokenType::Less
+                };
+                self.make_token(token)
+            }
+            '>' => {
+                let token = if self.match_next('=') {
+                    TokenType::GreaterEqual
+                } else {
+                    TokenType::Greater
+                };
+                self.make_token(token)
+            }
+            '/' => self.make_token(TokenType::Slash),
             // TODO: Maybe a result of token would be better to catch non terminated strings and
             // other composite types
             '"' => self.string()?,
+            c if c.is_ascii_digit() => self.number(),
             c if c.is_alphabetic() => self.identifier(),
             _ => self.make_token(TokenType::EOF),
         };
