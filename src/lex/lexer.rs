@@ -1,5 +1,7 @@
 use core::fmt;
 
+use super::error::TokenError;
+
 #[derive(Debug, PartialEq, PartialOrd)]
 pub enum TokenType {
     // Single-character tokens.
@@ -219,7 +221,7 @@ impl<'a> Scanner<'a> {
         self.make_token(TokenType::Number(value))
     }
 
-    fn string(&mut self) -> Option<Token<'a>> {
+    fn string(&mut self) -> Result<Token<'a>, TokenError> {
         while let Some(c) = self.peek() {
             if c == '"' {
                 break;
@@ -230,11 +232,13 @@ impl<'a> Scanner<'a> {
             self.read_char();
         }
 
-        self.peek()?;
+        self.peek().ok_or(TokenError::NonTerminatedString(
+            self.source[self.start..self.position].to_string(),
+        ))?;
 
         self.read_char();
 
-        Some(self.make_token(TokenType::String))
+        Ok(self.make_token(TokenType::String))
     }
     fn identifier(&mut self) -> Token<'a> {
         while let Some(c) = self.peek() {
@@ -268,11 +272,11 @@ impl<'a> Scanner<'a> {
         self.make_token(kind)
     }
 
-    pub fn next(&mut self) -> Option<Token<'a>> {
+    pub fn next(&mut self) -> Result<Token<'a>, TokenError> {
         self.skip_whitespace();
         self.start = self.position;
 
-        let c = self.read_char()?;
+        let c = self.read_char().ok_or(TokenError::UnexpectedEOF)?;
         let token = match c {
             '(' => self.make_token(TokenType::LeftParen),
             ')' => self.make_token(TokenType::RightParen),
@@ -317,15 +321,13 @@ impl<'a> Scanner<'a> {
                 self.make_token(token)
             }
             '/' => self.make_token(TokenType::Slash),
-            // TODO: Maybe a result of token would be better to catch non terminated strings and
-            // other composite types
             '"' => self.string()?,
             c if c.is_ascii_digit() => self.number(),
             c if c.is_alphabetic() => self.identifier(),
-            _ => self.make_token(TokenType::EOF),
+            _ => return Err(TokenError::UnexpectedToken(c.to_string())),
         };
 
-        Some(token)
+        Ok(token)
     }
 }
 
@@ -397,7 +399,10 @@ mod test {
         let span = Span { begin: 0, end: 6 };
         let token = Token::new(TokenType::String, "\"test\"", 1, span);
         assert_eq!(token, scanner.next().unwrap());
-        assert_eq!(None, scanner.next());
+        assert_eq!(
+            Err(TokenError::NonTerminatedString("\"test".to_string())),
+            scanner.next()
+        );
     }
 
     #[test]
@@ -413,5 +418,15 @@ mod test {
         span = Span { begin: 10, end: 15 };
         token = Token::new(TokenType::Class, "class", 1, span);
         assert_eq!(token, scanner.next().unwrap());
+    }
+
+    #[test]
+    fn err() {
+        let input = "💣";
+        let mut scanner = Scanner::new(input);
+        assert_eq!(
+            Err(TokenError::UnexpectedToken("💣".to_string())),
+            scanner.next()
+        );
     }
 }
