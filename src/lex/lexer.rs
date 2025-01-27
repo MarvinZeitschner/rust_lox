@@ -236,6 +236,37 @@ impl<'a> Scanner<'a> {
 
         Some(self.make_token(TokenType::String))
     }
+    fn identifier(&mut self) -> Token<'a> {
+        while let Some(c) = self.peek() {
+            if c.is_whitespace() {
+                break;
+            }
+            self.read_char();
+        }
+
+        let lexeme = &self.source[self.start..self.position];
+        let kind = match lexeme {
+            "and" => TokenType::And,
+            "class" => TokenType::Class,
+            "else" => TokenType::Else,
+            "false" => TokenType::False,
+            "for" => TokenType::For,
+            "fun" => TokenType::Fun,
+            "if" => TokenType::If,
+            "nil" => TokenType::Nil,
+            "or" => TokenType::Or,
+            "print" => TokenType::Print,
+            "return" => TokenType::Return,
+            "super" => TokenType::Super,
+            "this" => TokenType::This,
+            "true" => TokenType::True,
+            "var" => TokenType::Var,
+            "while" => TokenType::While,
+            _ => TokenType::Ident,
+        };
+
+        self.make_token(kind)
+    }
 
     pub fn next(&mut self) -> Option<Token<'a>> {
         self.skip_whitespace();
@@ -265,6 +296,7 @@ impl<'a> Scanner<'a> {
             // TODO: Maybe a result of token would be better to catch non terminated strings and
             // other composite types
             '"' => self.string()?,
+            c if c.is_alphabetic() => self.identifier(),
             _ => self.make_token(TokenType::EOF),
         };
 
@@ -335,10 +367,26 @@ mod test {
 
     #[test]
     fn string() {
-        let input = "\"test\"";
+        let input = "\"test\" \"test";
         let mut scanner = Scanner::new(input);
         let span = Span { begin: 0, end: 6 };
         let token = Token::new(TokenType::String, "\"test\"", 1, span);
+        assert_eq!(token, scanner.next().unwrap());
+        assert_eq!(None, scanner.next());
+    }
+
+    #[test]
+    fn ident() {
+        let input = "test t123 class";
+        let mut scanner = Scanner::new(input);
+        let mut span = Span { begin: 0, end: 4 };
+        let mut token = Token::new(TokenType::Ident, "test", 1, span);
+        assert_eq!(token, scanner.next().unwrap());
+        span = Span { begin: 5, end: 9 };
+        token = Token::new(TokenType::Ident, "t123", 1, span);
+        assert_eq!(token, scanner.next().unwrap());
+        span = Span { begin: 10, end: 15 };
+        token = Token::new(TokenType::Class, "class", 1, span);
         assert_eq!(token, scanner.next().unwrap());
     }
 }
