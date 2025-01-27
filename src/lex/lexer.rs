@@ -192,26 +192,22 @@ impl<'a> Scanner<'a> {
 
     fn number(&mut self) -> Token<'a> {
         while let Some(c) = self.peek() {
-            if c.is_ascii_digit() {
-                self.read_char();
-            } else {
+            if !c.is_ascii_digit() {
                 break;
             }
+            self.read_char();
         }
 
-        // Isn't this already a look-ahead of 2?
-        // So LL(2)?
         if let Some('.') = self.peek() {
             if let Some(next) = self.peek_nth(1) {
                 if next.is_ascii_digit() {
                     self.read_char();
 
                     while let Some(c) = self.peek() {
-                        if c.is_ascii_digit() {
-                            self.read_char();
-                        } else {
+                        if !c.is_ascii_digit() {
                             break;
                         }
+                        self.read_char();
                     }
                 }
             }
@@ -221,6 +217,24 @@ impl<'a> Scanner<'a> {
             .parse()
             .unwrap_or(0.0);
         self.make_token(TokenType::Number(value))
+    }
+
+    fn string(&mut self) -> Option<Token<'a>> {
+        while let Some(c) = self.peek() {
+            if c == '"' {
+                break;
+            }
+            if c == '\n' {
+                self.line += 1;
+            }
+            self.read_char();
+        }
+
+        self.peek()?;
+
+        self.read_char();
+
+        Some(self.make_token(TokenType::String))
     }
 
     pub fn next(&mut self) -> Option<Token<'a>> {
@@ -248,6 +262,9 @@ impl<'a> Scanner<'a> {
                 self.make_token(token)
             }
             '0'..='9' => self.number(),
+            // TODO: Maybe a result of token would be better to catch non terminated strings and
+            // other composite types
+            '"' => self.string()?,
             _ => self.make_token(TokenType::EOF),
         };
 
@@ -313,6 +330,15 @@ mod test {
         assert_eq!(token, scanner.next().unwrap());
         span = Span { begin: 9, end: 12 };
         token = Token::new(TokenType::Number(123.0), "123", 1, span);
+        assert_eq!(token, scanner.next().unwrap());
+    }
+
+    #[test]
+    fn string() {
+        let input = "\"test\"";
+        let mut scanner = Scanner::new(input);
+        let span = Span { begin: 0, end: 6 };
+        let token = Token::new(TokenType::String, "\"test\"", 1, span);
         assert_eq!(token, scanner.next().unwrap());
     }
 }
