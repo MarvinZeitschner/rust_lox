@@ -100,7 +100,7 @@ impl<'a> fmt::Display for Token<'a> {
             TokenType::Less => write!(f, "Less {lexeme} null"),
             TokenType::LessEqual => write!(f, "LessEqual {lexeme} null"),
             TokenType::Ident => write!(f, "Ident {lexeme} null"),
-            TokenType::String => write!(f, "String {lexeme} null"),
+            TokenType::String => write!(f, "String {lexeme} {lexeme}"),
             TokenType::Number(n) => write!(f, "Number {lexeme} {n}"),
             TokenType::And => write!(f, "And {lexeme} null"),
             TokenType::Class => write!(f, "Class {lexeme} null"),
@@ -143,6 +143,9 @@ impl<'a> Scanner<'a> {
     fn peek(&self) -> Option<char> {
         self.source[self.position..].chars().next()
     }
+    fn peek_nth(&self, nth: usize) -> Option<char> {
+        self.source[self.position..].chars().nth(nth)
+    }
 
     fn read_char(&mut self) -> Option<char> {
         if self.position < self.source.len() {
@@ -177,6 +180,49 @@ impl<'a> Scanner<'a> {
         )
     }
 
+    fn match_next(&mut self, expected: char) -> bool {
+        if let Some(c) = self.peek() {
+            if c == expected {
+                self.read_char();
+                return true;
+            }
+        }
+        false
+    }
+
+    fn number(&mut self) -> Token<'a> {
+        while let Some(c) = self.peek() {
+            if c.is_ascii_digit() {
+                self.read_char();
+            } else {
+                break;
+            }
+        }
+
+        // Isn't this already a look-ahead of 2?
+        // So LL(2)?
+        if let Some('.') = self.peek() {
+            if let Some(next) = self.peek_nth(1) {
+                if next.is_ascii_digit() {
+                    self.read_char();
+
+                    while let Some(c) = self.peek() {
+                        if c.is_ascii_digit() {
+                            self.read_char();
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        let value: f64 = self.source[self.start..self.position]
+            .parse()
+            .unwrap_or(0.0);
+        self.make_token(TokenType::Number(value))
+    }
+
     pub fn next(&mut self) -> Option<Token<'a>> {
         self.skip_whitespace();
         self.start = self.position;
@@ -184,6 +230,24 @@ impl<'a> Scanner<'a> {
         let c = self.read_char()?;
         let token = match c {
             '(' => self.make_token(TokenType::LeftParen),
+            ')' => self.make_token(TokenType::RightParen),
+            '{' => self.make_token(TokenType::LeftBrace),
+            '}' => self.make_token(TokenType::RightBrace),
+            ',' => self.make_token(TokenType::Comma),
+            '.' => self.make_token(TokenType::Dot),
+            '-' => self.make_token(TokenType::Minus),
+            '+' => self.make_token(TokenType::Plus),
+            '*' => self.make_token(TokenType::Star),
+            ';' => self.make_token(TokenType::Semicolon),
+            '!' => {
+                let token = if self.match_next('=') {
+                    TokenType::BangEqual
+                } else {
+                    TokenType::Bang
+                };
+                self.make_token(token)
+            }
+            '0'..='9' => self.number(),
             _ => self.make_token(TokenType::EOF),
         };
 
@@ -222,6 +286,33 @@ mod test {
         let input = "(";
         let mut scanner = Scanner::new(input);
         let token = Token::new(TokenType::LeftParen, "(", 1, Span { begin: 0, end: 1 });
+        assert_eq!(token, scanner.next().unwrap());
+    }
+
+    #[test]
+    fn composite() {
+        let input = "!= ! !=";
+        let mut scanner = Scanner::new(input);
+        let mut span = Span { begin: 0, end: 2 };
+        let mut token = Token::new(TokenType::BangEqual, "!=", 1, span);
+        assert_eq!(token, scanner.next().unwrap());
+        span = Span { begin: 3, end: 4 };
+        token = Token::new(TokenType::Bang, "!", 1, span);
+        assert_eq!(token, scanner.next().unwrap());
+        span = Span { begin: 5, end: 7 };
+        token = Token::new(TokenType::BangEqual, "!=", 1, span);
+        assert_eq!(token, scanner.next().unwrap());
+    }
+
+    #[test]
+    fn number() {
+        let input = "1234.123 123";
+        let mut scanner = Scanner::new(input);
+        let mut span = Span { begin: 0, end: 8 };
+        let mut token = Token::new(TokenType::Number(1234.123), "1234.123", 1, span);
+        assert_eq!(token, scanner.next().unwrap());
+        span = Span { begin: 9, end: 12 };
+        token = Token::new(TokenType::Number(123.0), "123", 1, span);
         assert_eq!(token, scanner.next().unwrap());
     }
 }
