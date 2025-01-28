@@ -161,10 +161,23 @@ impl<'a> Scanner<'a> {
 
     fn skip_whitespace(&mut self) {
         while let Some(c) = self.peek() {
-            if c.is_whitespace() {
-                self.read_char();
-            } else {
-                break;
+            match c {
+                ' ' | '\r' | '\t' => {
+                    self.read_char();
+                }
+                '\n' => {
+                    self.line += 1;
+                    self.read_char();
+                }
+                '/' if self.peek_nth(1) == Some('/') => {
+                    while let Some(c) = self.read_char() {
+                        if c == '\n' {
+                            self.line += 1;
+                            break;
+                        }
+                    }
+                }
+                _ => break,
             }
         }
     }
@@ -428,5 +441,13 @@ mod test {
             Err(TokenError::UnexpectedToken("💣".to_string())),
             scanner.next()
         );
+    }
+
+    #[test]
+    fn single_line_comment() {
+        let mut scanner = Scanner::new("// This is a comment\nvar x");
+        let span = Span { begin: 21, end: 24 };
+        let token = Token::new(TokenType::Var, "var", 2, span);
+        assert_eq!(token, scanner.next().unwrap());
     }
 }
