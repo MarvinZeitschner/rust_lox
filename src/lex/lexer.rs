@@ -195,6 +195,18 @@ impl<'a> Scanner<'a> {
         )
     }
 
+    fn make_token_with_lexeme(&self, kind: TokenType, lexeme: &'a str) -> Token<'a> {
+        Token::new(
+            kind,
+            lexeme,
+            self.line,
+            Span {
+                begin: self.start as u32,
+                end: self.position as u32,
+            },
+        )
+    }
+
     fn match_next(&mut self, expected: char) -> bool {
         if let Some(c) = self.peek() {
             if c == expected {
@@ -251,7 +263,8 @@ impl<'a> Scanner<'a> {
 
         self.read_char();
 
-        Ok(self.make_token(TokenType::String))
+        let lexeme = &self.source[self.start + 1..self.position - 1];
+        Ok(self.make_token_with_lexeme(TokenType::String, lexeme))
     }
     fn identifier(&mut self) -> Token<'a> {
         while let Some(c) = self.peek() {
@@ -410,7 +423,7 @@ mod test {
         let input = "\"test\" \"test";
         let mut scanner = Scanner::new(input);
         let span = Span { begin: 0, end: 6 };
-        let token = Token::new(TokenType::String, "\"test\"", 1, span);
+        let token = Token::new(TokenType::String, "test", 1, span);
         assert_eq!(token, scanner.next().unwrap());
         assert_eq!(
             Err(TokenError::NonTerminatedString("\"test".to_string())),
