@@ -1,0 +1,11 @@
+[lib]
+proc-macro = true
+
+[package]
+name = "ast_macro"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+quote = "1.0.38"
+syn = { version = "2.0.98", features = ["full"] }
