@@ -1,11 +1,15 @@
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{format_ident, quote};
 use syn::{parse_macro_input, Data, DeriveInput, Fields};
 
 #[proc_macro_derive(Ast)]
 pub fn ast_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    let name = &input.ident;
+    if input.ident == format_ident!("Expr") {
+        panic!("Enum can't be named Expr, since it generates this enum");
+    }
+
+    let name = format_ident!("Expr");
     let vis = &input.vis;
 
     let Data::Enum(data_enum) = input.data else {
@@ -14,6 +18,8 @@ pub fn ast_derive(input: TokenStream) -> TokenStream {
 
     let mut structs = vec![];
     let mut enum_variants = vec![];
+    let mut visitor_methods = vec![];
+    let mut accept_match_arms = vec![];
 
     for variant in &data_enum.variants {
         let variant_name = &variant.ident;
@@ -21,8 +27,7 @@ pub fn ast_derive(input: TokenStream) -> TokenStream {
             panic!("Enum variants must have named fields");
         };
 
-        let struct_name =
-            syn::Ident::new(&format!("{}{}", name, variant_name), variant_name.span());
+        let struct_name = format_ident!("{}{}", name, variant_name);
 
         let struct_fields = fields.named.iter().map(|f| {
             let field_name = &f.ident;
@@ -41,6 +46,18 @@ pub fn ast_derive(input: TokenStream) -> TokenStream {
             .iter()
             .map(|f| f.ty.clone())
             .collect::<Vec<_>>();
+
+        let visitor_method_name =
+            format_ident!("visit_{}", variant_name.to_string().to_lowercase());
+
+        visitor_methods.push(quote! {
+            fn #visitor_method_name(&mut self, node: &#struct_name) -> T;
+        });
+
+        // TODO: Check if "ref node" can/should be used here to not consume the node
+        accept_match_arms.push(quote! {
+            #name::#variant_name(node) => visitor.#visitor_method_name(node)
+        });
 
         structs.push(quote! {
             #vis struct #struct_name {
@@ -61,14 +78,33 @@ pub fn ast_derive(input: TokenStream) -> TokenStream {
         });
     }
 
-    let enum_name = syn::Ident::new(&format!("{}Ast", name), name.span());
+    let visitor_name = format_ident!("Visitor");
+    let visitor_trait = quote! {
+        pub trait #visitor_name<T> {
+            #(#visitor_methods)*
+        }
+    };
 
-    let expanded = quote! {
-        #(#structs)*
-
-        #vis enum #enum_name{
+    let expr_enum = quote! {
+        #vis enum #name {
             #(#enum_variants),*
         }
+
+        impl #name {
+            #vis fn accept<T, R: #visitor_name<T>>(&self, visitor: &mut R) -> T {
+                match self {
+                    #(#accept_match_arms),*
+                }
+            }
+        }
+    };
+
+    let expanded = quote! {
+        #visitor_trait
+
+        #(#structs)*
+
+        #expr_enum
     };
 
     TokenStream::from(expanded)
