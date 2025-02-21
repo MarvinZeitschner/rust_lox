@@ -1,4 +1,4 @@
-use super::ast_gr::*;
+use super::*;
 
 struct AstPrinter;
 

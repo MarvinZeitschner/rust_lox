@@ -61,7 +61,7 @@ pub struct Span {
 
 #[derive(Debug, PartialEq, PartialOrd)]
 pub struct Token<'a> {
-    kind: TokenType,
+    pub kind: TokenType,
     lexeme: &'a str,
     line: u32,
     span: Span,
