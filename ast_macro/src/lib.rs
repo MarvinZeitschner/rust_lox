@@ -102,8 +102,12 @@ pub fn ast_derive(input: TokenStream) -> TokenStream {
     let expanded = quote! {
         #visitor_trait
 
-        #(#structs)*
+        #(
+            #[derive(Debug)]
+            #structs
+        )*
 
+        #[derive(Debug)]
         #expr_enum
     };
 
