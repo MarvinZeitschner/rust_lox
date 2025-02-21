@@ -1,6 +1,6 @@
 use ast_macro::Ast;
 
-#[derive(Debug, PartialEq, PartialOrd)]
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub enum LiteralValue {
     String(String),
     F64(f64),
@@ -41,6 +41,31 @@ impl Visitor<f64> for Evaluator {
         }
     }
 }
+
+struct AstPrinter;
+
+impl AstPrinter {
+    fn parenthesize(&mut self, name: String, node: &[&Expr]) -> String {
+        let expr_ac: Vec<String> = node.iter().map(|node| node.accept(self)).collect();
+        format!("({} {})", name, expr_ac.join(" "))
+    }
+}
+
+impl Visitor<String> for AstPrinter {
+    fn visit_literal(&mut self, node: &ExprLiteral) -> String {
+        match &node.value {
+            LiteralValue::String(value) => value.clone(),
+            LiteralValue::F64(value) => value.to_string(),
+        }
+    }
+
+    fn visit_binary(&mut self, node: &ExprBinary) -> String {
+        // Only for testing
+        // The impl is going to be much nicer
+        self.parenthesize(node.operator.clone(), &[&node.left, &node.right])
+    }
+}
+
 #[test]
 fn expr_expansion() {
     let literal = ExprLiteral::new(LiteralValue::F64(42.0));
@@ -70,4 +95,20 @@ fn evaluator_visitor() {
     let result = expr.accept(&mut evaluator);
 
     assert_eq!(result, 16.0);
+}
+
+#[test]
+fn ast_printer() {
+    // Expr: (5 + 3) * 2 = 16
+    let five = Box::new(Expr::Literal(ExprLiteral::new(LiteralValue::F64(5.1))));
+    let three = Box::new(Expr::Literal(ExprLiteral::new(LiteralValue::F64(3.1))));
+    let add = Box::new(Expr::Binary(ExprBinary::new(five, "+".to_string(), three)));
+    let two = Box::new(Expr::Literal(ExprLiteral::new(LiteralValue::F64(2.1))));
+    let mult = ExprBinary::new(add, "*".to_string(), two);
+    let expr = Expr::Binary(mult);
+
+    let mut printer = AstPrinter;
+    let result = expr.accept(&mut printer);
+
+    assert_eq!(result, "(* (+ 5.1 3.1) 2.1)");
 }
