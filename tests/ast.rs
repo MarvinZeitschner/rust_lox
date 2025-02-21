@@ -60,8 +60,6 @@ impl Visitor<String> for AstPrinter {
     }
 
     fn visit_binary(&mut self, node: &ExprBinary) -> String {
-        // Only for testing
-        // The impl is going to be much nicer
         self.parenthesize(node.operator.clone(), &[&node.left, &node.right])
     }
 }
