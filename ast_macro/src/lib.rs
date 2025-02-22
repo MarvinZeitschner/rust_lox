@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, Data, DeriveInput, Fields, Type};
+use syn::{parse_macro_input, Data, DeriveInput, Fields, GenericParam, Type};
 
 fn type_needs_lifetime(ty: &Type) -> bool {
     match ty {
@@ -10,11 +10,7 @@ fn type_needs_lifetime(ty: &Type) -> bool {
         Type::Path(type_path) => {
             let last_segment = type_path.path.segments.last().unwrap();
             // Check if it's Box<Expr> or similar
-            if last_segment.ident == "Box" || last_segment.ident == "Expr" {
-                true
-            } else {
-                false
-            }
+            last_segment.ident == "Box" || last_segment.ident == "Expr"
         }
         _ => false,
     }
@@ -33,6 +29,23 @@ pub fn ast_derive(input: TokenStream) -> TokenStream {
 
     let name = format_ident!("Expr");
     let vis = &input.vis;
+    let has_lifetime = input
+        .generics
+        .params
+        .iter()
+        .any(|param| matches!(param, GenericParam::Lifetime(_)));
+
+    let high_lt = if has_lifetime {
+        quote! { <'a> }
+    } else {
+        quote! {}
+    };
+    let high_lt_comma = if has_lifetime {
+        quote! { 'a, }
+    } else {
+        quote! {}
+    };
+
     let Data::Enum(data_enum) = input.data else {
         panic!("#[derive(Ast)] can only be used on enums");
     };
@@ -51,7 +64,9 @@ pub fn ast_derive(input: TokenStream) -> TokenStream {
         let struct_name = format_ident!("{}{}", name, variant_name);
         let needs_lifetime = struct_needs_lifetime(&variant.fields);
 
-        let lifetime_param = if needs_lifetime {
+        let lifetime_param = if !has_lifetime {
+            quote! {}
+        } else if needs_lifetime {
             quote! { <'a> }
         } else {
             quote! {}
@@ -104,7 +119,7 @@ pub fn ast_derive(input: TokenStream) -> TokenStream {
 
         // Add lifetime to enum variant only if needed
         enum_variants.push(if needs_lifetime {
-            quote! { #variant_name(#struct_name<'a>) }
+            quote! { #variant_name(#struct_name #lifetime_param) }
         } else {
             quote! { #variant_name(#struct_name) }
         });
@@ -113,19 +128,19 @@ pub fn ast_derive(input: TokenStream) -> TokenStream {
     let visitor_name = format_ident!("Visitor");
 
     let visitor_trait = quote! {
-        pub trait #visitor_name<'a, T> {
+        pub trait #visitor_name<#high_lt_comma T> {
             #(#visitor_methods)*
         }
     };
 
     let expr_enum = quote! {
         #[derive(Debug)]
-        #vis enum #name<'a> {
+        #vis enum #name #high_lt {
             #(#enum_variants),*
         }
 
-        impl<'a> #name<'a> {
-            #vis fn accept<T, V: #visitor_name<'a, T>>(&self, visitor: &mut V) -> T {
+        impl #high_lt #name #high_lt {
+            #vis fn accept<T, V: #visitor_name<#high_lt_comma T>>(&self, visitor: &mut V) -> T {
                 match self {
                     #(#accept_match_arms),*
                 }
