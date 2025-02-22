@@ -58,20 +58,21 @@ impl<'a> Parser<'a> {
     }
 
     fn equality(&mut self) -> Expr {
-        let expr = self.comparison();
-
-        while self.match_l(vec![
-            TokenType::Greater,
-            TokenType::GreaterEqual,
-            TokenType::Less,
-            TokenType::LessEqual,
-        ]) {
-            let operator = self.previous();
-            let right = self.comparison();
-            expr = Expr::Binary(ExprBinary::new(Box::new(expr), operator, Box::new(right)));
-        }
-
-        expr
+        todo!()
+        // let expr = self.comparison();
+        //
+        // while self.match_l(vec![
+        //     TokenType::Greater,
+        //     TokenType::GreaterEqual,
+        //     TokenType::Less,
+        //     TokenType::LessEqual,
+        // ]) {
+        //     let operator = self.previous();
+        //     let right = self.comparison();
+        //     expr = Expr::Binary(ExprBinary::new(Box::new(expr), operator, Box::new(right)));
+        // }
+        //
+        // expr
     }
 
     fn comparison(&mut self) -> Expr {

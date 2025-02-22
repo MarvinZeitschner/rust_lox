@@ -13,20 +13,20 @@ pub enum LiteralValue {
 }
 
 #[derive(Ast, Debug)]
-pub enum Expression {
+pub enum Expression<'a> {
     Literal {
         value: LiteralValue,
     },
     Grouping {
-        value: Box<Expr>,
+        value: Box<Expr<'a>>,
     },
     Unary {
-        operator: String,
-        value: Box<Expr>,
+        operator: &'a Token<'a>,
+        value: Box<Expr<'a>>,
     },
     Binary {
-        left: Box<Expr>,
-        operator: &'a Token,
-        right: Box<Expr>,
+        left: Box<Expr<'a>>,
+        operator: &'a Token<'a>,
+        right: Box<Expr<'a>>,
     },
 }

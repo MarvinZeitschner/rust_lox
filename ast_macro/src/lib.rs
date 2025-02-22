@@ -1,6 +1,28 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, Data, DeriveInput, Fields};
+use syn::{parse_macro_input, Data, DeriveInput, Fields, Type};
+
+fn type_needs_lifetime(ty: &Type) -> bool {
+    match ty {
+        // Check for direct references
+        Type::Reference(_) => true,
+        // Check for types that might contain our Expr type with lifetime
+        Type::Path(type_path) => {
+            let last_segment = type_path.path.segments.last().unwrap();
+            // Check if it's Box<Expr> or similar
+            if last_segment.ident == "Box" || last_segment.ident == "Expr" {
+                true
+            } else {
+                false
+            }
+        }
+        _ => false,
+    }
+}
+
+fn struct_needs_lifetime(fields: &Fields) -> bool {
+    fields.iter().any(|field| type_needs_lifetime(&field.ty))
+}
 
 #[proc_macro_derive(Ast)]
 pub fn ast_derive(input: TokenStream) -> TokenStream {
@@ -11,7 +33,6 @@ pub fn ast_derive(input: TokenStream) -> TokenStream {
 
     let name = format_ident!("Expr");
     let vis = &input.vis;
-
     let Data::Enum(data_enum) = input.data else {
         panic!("#[derive(Ast)] can only be used on enums");
     };
@@ -28,6 +49,13 @@ pub fn ast_derive(input: TokenStream) -> TokenStream {
         };
 
         let struct_name = format_ident!("{}{}", name, variant_name);
+        let needs_lifetime = struct_needs_lifetime(&variant.fields);
+
+        let lifetime_param = if needs_lifetime {
+            quote! { <'a> }
+        } else {
+            quote! {}
+        };
 
         let struct_fields = fields.named.iter().map(|f| {
             let field_name = &f.ident;
@@ -51,20 +79,21 @@ pub fn ast_derive(input: TokenStream) -> TokenStream {
             format_ident!("visit_{}", variant_name.to_string().to_lowercase());
 
         visitor_methods.push(quote! {
-            fn #visitor_method_name(&mut self, node: &#struct_name) -> T;
+            fn #visitor_method_name(&mut self, node: &#struct_name #lifetime_param) -> T;
         });
 
-        // TODO: Check if "ref node" can/should be used here to not consume the node
         accept_match_arms.push(quote! {
-            #name::#variant_name(node) => visitor.#visitor_method_name(node)
+            Self::#variant_name(node) => visitor.#visitor_method_name(node)
         });
 
+        // Generate struct with lifetime only if needed
         structs.push(quote! {
-            #vis struct #struct_name {
+            #[derive(Debug)]
+            #vis struct #struct_name #lifetime_param {
                 #(#struct_fields),*
             }
 
-            impl #struct_name {
+            impl #lifetime_param #struct_name #lifetime_param {
                 #vis fn new(#(#field_names: #field_types),*) -> Self {
                     Self {
                         #(#field_names),*
@@ -73,25 +102,30 @@ pub fn ast_derive(input: TokenStream) -> TokenStream {
             }
         });
 
-        enum_variants.push(quote! {
-            #variant_name(#struct_name)
+        // Add lifetime to enum variant only if needed
+        enum_variants.push(if needs_lifetime {
+            quote! { #variant_name(#struct_name<'a>) }
+        } else {
+            quote! { #variant_name(#struct_name) }
         });
     }
 
     let visitor_name = format_ident!("Visitor");
+
     let visitor_trait = quote! {
-        pub trait #visitor_name<T> {
+        pub trait #visitor_name<'a, T> {
             #(#visitor_methods)*
         }
     };
 
     let expr_enum = quote! {
-        #vis enum #name {
+        #[derive(Debug)]
+        #vis enum #name<'a> {
             #(#enum_variants),*
         }
 
-        impl #name {
-            #vis fn accept<T, R: #visitor_name<T>>(&self, visitor: &mut R) -> T {
+        impl<'a> #name<'a> {
+            #vis fn accept<T, V: #visitor_name<'a, T>>(&self, visitor: &mut V) -> T {
                 match self {
                     #(#accept_match_arms),*
                 }
@@ -102,12 +136,8 @@ pub fn ast_derive(input: TokenStream) -> TokenStream {
     let expanded = quote! {
         #visitor_trait
 
-        #(
-            #[derive(Debug)]
-            #structs
-        )*
+        #(#structs)*
 
-        #[derive(Debug)]
         #expr_enum
     };
 
