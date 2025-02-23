@@ -1,5 +1,7 @@
 pub mod error;
 
+use error::ParserError;
+
 use crate::{
     ast::{Expr, ExprBinary, ExprGrouping, ExprLiteral, ExprUnary, LiteralValue},
     lex::lexer::{Token, TokenType},
@@ -54,23 +56,14 @@ impl<'a> TokenStream<'a> {
         false
     }
 
-    // fn match_l_token(&mut self, kinds: &[TokenType]) -> Option<Token<'a>> {
-    //     for kind in kinds {
-    //         if self.check(kind) {
-    //             self.advance();
-    //             return Some(self.previous());
-    //         }
-    //     }
-    //     None
-    // }
-
-    fn consume(&mut self, kind: &TokenType, message: &str) {
+    fn consume(&mut self, kind: &TokenType) -> Result<(), ParserError<'a>> {
         if self.check(kind) {
             self.advance();
-            return;
+            return Ok(());
         }
-
-        //error
+        Err(ParserError::UnexpectedToken {
+            token: self.previous(),
+        })
     }
 }
 
@@ -83,26 +76,26 @@ impl<'a> Parser<'a> {
         Self { tokenstream }
     }
 
-    fn expression(&mut self) -> Expr<'a> {
+    fn expression(&mut self) -> Result<Expr<'a>, ParserError<'a>> {
         self.equality()
     }
 
-    fn equality(&mut self) -> Expr<'a> {
-        let mut expr = self.comparison();
+    fn equality(&mut self) -> Result<Expr<'a>, ParserError<'a>> {
+        let mut expr = self.comparison()?;
 
         let operators = [TokenType::BangEqual, TokenType::EqualEqual];
 
         while self.tokenstream.match_l(&operators) {
             let operator = self.tokenstream.previous();
-            let right = self.comparison();
+            let right = self.comparison()?;
             expr = Expr::Binary(ExprBinary::new(Box::new(expr), operator, Box::new(right)));
         }
 
-        expr
+        Ok(expr)
     }
 
-    fn comparison(&mut self) -> Expr<'a> {
-        let mut expr = self.term();
+    fn comparison(&mut self) -> Result<Expr<'a>, ParserError<'a>> {
+        let mut expr = self.term()?;
 
         let operators = [
             TokenType::Greater,
@@ -113,67 +106,66 @@ impl<'a> Parser<'a> {
 
         while self.tokenstream.match_l(&operators) {
             let operator = self.tokenstream.previous();
-            let right = self.term();
+            let right = self.term()?;
             expr = Expr::Binary(ExprBinary::new(Box::new(expr), operator, Box::new(right)));
         }
 
-        expr
+        Ok(expr)
     }
 
-    fn term(&mut self) -> Expr<'a> {
-        let mut expr = self.factor();
+    fn term(&mut self) -> Result<Expr<'a>, ParserError<'a>> {
+        let mut expr = self.factor()?;
 
         let operators = [TokenType::Minus, TokenType::Plus];
 
         while self.tokenstream.match_l(&operators) {
             let operator = self.tokenstream.previous();
-            let right = self.factor();
+            let right = self.factor()?;
             expr = Expr::Binary(ExprBinary::new(Box::new(expr), operator, Box::new(right)))
         }
 
-        expr
+        Ok(expr)
     }
 
-    fn factor(&mut self) -> Expr<'a> {
-        let mut expr = self.unary();
+    fn factor(&mut self) -> Result<Expr<'a>, ParserError<'a>> {
+        let mut expr = self.unary()?;
 
         let operators = [TokenType::Slash, TokenType::Star];
 
         while self.tokenstream.match_l(&operators) {
             let operator = self.tokenstream.previous();
-            let right = self.unary();
+            let right = self.unary()?;
             expr = Expr::Binary(ExprBinary::new(Box::new(expr), operator, Box::new(right)))
         }
 
-        expr
+        Ok(expr)
     }
 
-    fn unary(&mut self) -> Expr<'a> {
+    fn unary(&mut self) -> Result<Expr<'a>, ParserError<'a>> {
         let operators = [TokenType::Bang, TokenType::Minus];
 
         if self.tokenstream.match_l(&operators) {
             let operator = self.tokenstream.previous();
-            let right = self.unary();
-            return Expr::Unary(ExprUnary::new(operator, Box::new(right)));
+            let right = self.unary()?;
+            return Ok(Expr::Unary(ExprUnary::new(operator, Box::new(right))));
         }
 
         self.primary()
     }
 
-    fn primary(&mut self) -> Expr<'a> {
+    fn primary(&mut self) -> Result<Expr<'a>, ParserError<'a>> {
         match self.tokenstream.peek().kind {
-            TokenType::False => Expr::Literal(ExprLiteral::new(LiteralValue::Bool(false))),
-            TokenType::True => Expr::Literal(ExprLiteral::new(LiteralValue::Bool(true))),
-            TokenType::Nil => Expr::Literal(ExprLiteral::new(LiteralValue::Nil)),
-            TokenType::Number(val) => Expr::Literal(ExprLiteral::new(LiteralValue::F64(val))),
-            TokenType::String => Expr::Literal(ExprLiteral::new(LiteralValue::String(
+            TokenType::False => Ok(Expr::Literal(ExprLiteral::new(LiteralValue::Bool(false)))),
+            TokenType::True => Ok(Expr::Literal(ExprLiteral::new(LiteralValue::Bool(true)))),
+            TokenType::Nil => Ok(Expr::Literal(ExprLiteral::new(LiteralValue::Nil))),
+            TokenType::Number(val) => Ok(Expr::Literal(ExprLiteral::new(LiteralValue::F64(val)))),
+            TokenType::String => Ok(Expr::Literal(ExprLiteral::new(LiteralValue::String(
                 self.tokenstream.previous().lexeme.to_string(),
-            ))),
+            )))),
             TokenType::LeftParen => {
-                let expr = self.expression();
-                self.tokenstream
-                    .consume(&TokenType::RightParen, "Expected ')' after expression");
-                return Expr::Grouping(ExprGrouping::new(Box::new(expr)));
+                let expr = self.expression()?;
+                self.tokenstream.consume(&TokenType::RightParen)?;
+                return Ok(Expr::Grouping(ExprGrouping::new(Box::new(expr))));
             }
             _ => todo!(),
         }
