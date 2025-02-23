@@ -478,9 +478,6 @@ mod test {
     fn scan() {
         let input = "1234.123 123";
         let mut scanner = Scanner::new(input);
-        // span = Span { begin: 9, end: 12 };
-        // token = Token::new(TokenType::Number(123.0), "123", 1, span);
-        // assert_eq!(token, scanner.next().unwrap());
 
         let tokens = scanner.scan_tokens();
 
@@ -488,6 +485,9 @@ mod test {
             let mut span = Span { begin: 0, end: 8 };
             let mut token = Token::new(TokenType::Number(1234.123), "1234.123", 1, span);
             assert_eq!(token, tokens[0]);
+            span = Span { begin: 9, end: 12 };
+            token = Token::new(TokenType::Number(123.0), "123", 1, span);
+            assert_eq!(token, tokens[1]);
         }
     }
 }
