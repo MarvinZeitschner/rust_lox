@@ -7,9 +7,7 @@ fn type_needs_lifetime(ty: &Type) -> bool {
         Type::Reference(_) => true,
         Type::Path(type_path) => {
             let last_segment = type_path.path.segments.last().unwrap();
-            last_segment.ident == "Box"
-                || last_segment.ident == "Expr"
-                || last_segment.ident == "Rc"
+            last_segment.ident == "Box" || last_segment.ident == "Expr"
         }
         _ => false,
     }
@@ -101,7 +99,7 @@ pub fn ast_derive(input: TokenStream) -> TokenStream {
         });
 
         structs.push(quote! {
-            #[derive(Debug)]
+            #[derive(Debug, PartialEq)]
             #vis struct #struct_name #lifetime_param {
                 #(#struct_fields),*
             }
@@ -131,7 +129,7 @@ pub fn ast_derive(input: TokenStream) -> TokenStream {
     };
 
     let expr_enum = quote! {
-        #[derive(Debug)]
+        #[derive(Debug, PartialEq)]
         #vis enum #name #high_lt {
             #(#enum_variants),*
         }
