@@ -2,7 +2,7 @@ use core::fmt;
 
 use super::error::TokenError;
 
-#[derive(Debug, PartialEq, PartialOrd)]
+#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 pub enum TokenType {
     // Single-character tokens.
     LeftParen,
@@ -53,17 +53,17 @@ pub enum TokenType {
     EOF,
 }
 
-#[derive(Debug, PartialEq, PartialOrd)]
+#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 pub struct Span {
     begin: u32,
     end: u32,
 }
 
-#[derive(Debug, PartialEq, PartialOrd)]
+#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 pub struct Token<'a> {
     pub kind: TokenType,
     pub lexeme: &'a str,
-    line: u32,
+    pub line: u32,
     span: Span,
 }
 

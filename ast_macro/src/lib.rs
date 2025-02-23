@@ -4,13 +4,12 @@ use syn::{parse_macro_input, Data, DeriveInput, Fields, GenericParam, Type};
 
 fn type_needs_lifetime(ty: &Type) -> bool {
     match ty {
-        // Check for direct references
         Type::Reference(_) => true,
-        // Check for types that might contain our Expr type with lifetime
         Type::Path(type_path) => {
             let last_segment = type_path.path.segments.last().unwrap();
-            // Check if it's Box<Expr> or similar
-            last_segment.ident == "Box" || last_segment.ident == "Expr"
+            last_segment.ident == "Box"
+                || last_segment.ident == "Expr"
+                || last_segment.ident == "Rc"
         }
         _ => false,
     }
@@ -101,7 +100,6 @@ pub fn ast_derive(input: TokenStream) -> TokenStream {
             Self::#variant_name(node) => visitor.#visitor_method_name(node)
         });
 
-        // Generate struct with lifetime only if needed
         structs.push(quote! {
             #[derive(Debug)]
             #vis struct #struct_name #lifetime_param {
@@ -117,7 +115,6 @@ pub fn ast_derive(input: TokenStream) -> TokenStream {
             }
         });
 
-        // Add lifetime to enum variant only if needed
         enum_variants.push(if needs_lifetime {
             quote! { #variant_name(#struct_name #lifetime_param) }
         } else {

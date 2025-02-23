@@ -21,12 +21,12 @@ pub enum Expression<'a> {
         value: Box<Expr<'a>>,
     },
     Unary {
-        operator: &'a Token<'a>,
+        operator: Token<'a>,
         value: Box<Expr<'a>>,
     },
     Binary {
         left: Box<Expr<'a>>,
-        operator: &'a Token<'a>,
+        operator: Token<'a>,
         right: Box<Expr<'a>>,
     },
 }
