@@ -125,7 +125,7 @@ impl<'a> fmt::Display for Token<'a> {
     }
 }
 
-struct Scanner<'a> {
+pub struct Scanner<'a> {
     source: &'a str,
     position: usize,
     start: usize,
@@ -140,6 +140,16 @@ impl<'a> Scanner<'a> {
             start: 0,
             line: 1,
         }
+    }
+
+    pub fn scan_tokens(&mut self) -> Result<Vec<Token<'a>>, TokenError> {
+        let mut tokens = vec![];
+        while self.position < self.source.len() {
+            self.start = self.position;
+            let token = self.next()?;
+            tokens.push(token);
+        }
+        Ok(tokens)
     }
 
     fn peek(&self) -> Option<char> {
@@ -462,5 +472,22 @@ mod test {
         let span = Span { begin: 21, end: 24 };
         let token = Token::new(TokenType::Var, "var", 2, span);
         assert_eq!(token, scanner.next().unwrap());
+    }
+
+    #[test]
+    fn scan() {
+        let input = "1234.123 123";
+        let mut scanner = Scanner::new(input);
+        // span = Span { begin: 9, end: 12 };
+        // token = Token::new(TokenType::Number(123.0), "123", 1, span);
+        // assert_eq!(token, scanner.next().unwrap());
+
+        let tokens = scanner.scan_tokens();
+
+        if let Ok(tokens) = tokens {
+            let mut span = Span { begin: 0, end: 8 };
+            let mut token = Token::new(TokenType::Number(1234.123), "1234.123", 1, span);
+            assert_eq!(token, tokens[0]);
+        }
     }
 }
