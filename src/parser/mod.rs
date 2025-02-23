@@ -76,6 +76,10 @@ impl<'a> Parser<'a> {
         Self { tokenstream }
     }
 
+    pub fn parse(&mut self) -> Result<Expr<'a>, ParserError<'a>> {
+        self.expression()
+    }
+
     fn expression(&mut self) -> Result<Expr<'a>, ParserError<'a>> {
         self.equality()
     }
@@ -167,7 +171,41 @@ impl<'a> Parser<'a> {
                 self.tokenstream.consume(&TokenType::RightParen)?;
                 return Ok(Expr::Grouping(ExprGrouping::new(Box::new(expr))));
             }
-            _ => todo!(),
+            _ => Err(ParserError::UnexpectedToken {
+                token: *self.tokenstream.peek(),
+            }),
         }
     }
 }
+
+// #[cfg(test)]
+// mod test {
+//     use crate::lex::lexer::{Scanner, Span};
+//
+//     use super::*;
+//     fn setup(input: &str) -> Parser {
+//         let mut lexer = Scanner::new(input);
+//         Parser::new(TokenStream::new(lexer.scan_tokens().unwrap()))
+//     }
+//
+//     #[test]
+//     fn test() {
+//         let input = "1 + 1";
+//         let mut parser = setup(input);
+//
+//         if let Ok(expr) = parser.parse() {
+//             let left = Expr::Literal(ExprLiteral::new(LiteralValue::F64(1.0)));
+//
+//             let span = Span { begin: 0, end: 8 };
+//             let operator = Token::new(TokenType::Number(1234.123), "1234.123", 1, span);
+//
+//             let right = Expr::Literal(ExprLiteral::new(LiteralValue::F64(1.0)));
+//
+//             assert_eq!(Expr::Binary(ExprBinary::new(
+//                 Box::new(left),
+//                 operator,
+//                 Box::new(right)
+//             )))
+//         }
+//     }
+// }

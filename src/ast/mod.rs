@@ -4,7 +4,7 @@ use ast_macro::Ast;
 
 use crate::lex::lexer::Token;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum LiteralValue {
     String(String),
     F64(f64),
@@ -12,7 +12,7 @@ pub enum LiteralValue {
     Nil,
 }
 
-#[derive(Ast, Debug)]
+#[derive(Ast, Debug, PartialEq)]
 pub enum Expression<'a> {
     Literal {
         value: LiteralValue,

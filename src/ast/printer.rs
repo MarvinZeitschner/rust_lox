@@ -1,6 +1,6 @@
 use super::*;
 
-struct AstPrinter;
+pub struct AstPrinter;
 
 impl AstPrinter {
     fn parenthesize(&mut self, name: &str, node: &[&Expr]) -> String {

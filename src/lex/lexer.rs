@@ -55,8 +55,8 @@ pub enum TokenType {
 
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 pub struct Span {
-    begin: u32,
-    end: u32,
+    pub begin: u32,
+    pub end: u32,
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
