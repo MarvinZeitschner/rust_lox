@@ -146,7 +146,7 @@ impl<'a> Scanner<'a> {
         let mut tokens = vec![];
         while self.position < self.source.len() {
             self.start = self.position;
-            let token = self.next()?;
+            let token = self.scan_token()?;
             tokens.push(token);
         }
         Ok(tokens)
@@ -308,11 +308,14 @@ impl<'a> Scanner<'a> {
         self.make_token(kind)
     }
 
-    pub fn next(&mut self) -> Result<Token<'a>, TokenError> {
+    pub fn scan_token(&mut self) -> Result<Token<'a>, TokenError> {
         self.skip_whitespace();
         self.start = self.position;
 
-        let c = self.read_char().ok_or(TokenError::UnexpectedEOF)?;
+        let c = self.read_char();
+        let Some(c) = c else {
+            return Ok(self.make_token(TokenType::EOF));
+        };
         let token = match c {
             '(' => self.make_token(TokenType::LeftParen),
             ')' => self.make_token(TokenType::RightParen),
@@ -398,7 +401,7 @@ mod test {
         let input = "(";
         let mut scanner = Scanner::new(input);
         let token = Token::new(TokenType::LeftParen, "(", 1, Span { begin: 0, end: 1 });
-        assert_eq!(token, scanner.next().unwrap());
+        assert_eq!(token, scanner.scan_token().unwrap());
     }
 
     #[test]
@@ -407,13 +410,13 @@ mod test {
         let mut scanner = Scanner::new(input);
         let mut span = Span { begin: 0, end: 2 };
         let mut token = Token::new(TokenType::BangEqual, "!=", 1, span);
-        assert_eq!(token, scanner.next().unwrap());
+        assert_eq!(token, scanner.scan_token().unwrap());
         span = Span { begin: 3, end: 4 };
         token = Token::new(TokenType::Bang, "!", 1, span);
-        assert_eq!(token, scanner.next().unwrap());
+        assert_eq!(token, scanner.scan_token().unwrap());
         span = Span { begin: 5, end: 7 };
         token = Token::new(TokenType::BangEqual, "!=", 1, span);
-        assert_eq!(token, scanner.next().unwrap());
+        assert_eq!(token, scanner.scan_token().unwrap());
     }
 
     #[test]
@@ -422,10 +425,10 @@ mod test {
         let mut scanner = Scanner::new(input);
         let mut span = Span { begin: 0, end: 8 };
         let mut token = Token::new(TokenType::Number(1234.123), "1234.123", 1, span);
-        assert_eq!(token, scanner.next().unwrap());
+        assert_eq!(token, scanner.scan_token().unwrap());
         span = Span { begin: 9, end: 12 };
         token = Token::new(TokenType::Number(123.0), "123", 1, span);
-        assert_eq!(token, scanner.next().unwrap());
+        assert_eq!(token, scanner.scan_token().unwrap());
     }
 
     #[test]
@@ -434,10 +437,10 @@ mod test {
         let mut scanner = Scanner::new(input);
         let span = Span { begin: 0, end: 6 };
         let token = Token::new(TokenType::String, "test", 1, span);
-        assert_eq!(token, scanner.next().unwrap());
+        assert_eq!(token, scanner.scan_token().unwrap());
         assert_eq!(
             Err(TokenError::NonTerminatedString("\"test".to_string())),
-            scanner.next()
+            scanner.scan_token()
         );
     }
 
@@ -447,13 +450,13 @@ mod test {
         let mut scanner = Scanner::new(input);
         let mut span = Span { begin: 0, end: 4 };
         let mut token = Token::new(TokenType::Ident, "test", 1, span);
-        assert_eq!(token, scanner.next().unwrap());
+        assert_eq!(token, scanner.scan_token().unwrap());
         span = Span { begin: 5, end: 9 };
         token = Token::new(TokenType::Ident, "t123", 1, span);
-        assert_eq!(token, scanner.next().unwrap());
+        assert_eq!(token, scanner.scan_token().unwrap());
         span = Span { begin: 10, end: 15 };
         token = Token::new(TokenType::Class, "class", 1, span);
-        assert_eq!(token, scanner.next().unwrap());
+        assert_eq!(token, scanner.scan_token().unwrap());
     }
 
     #[test]
@@ -462,7 +465,7 @@ mod test {
         let mut scanner = Scanner::new(input);
         assert_eq!(
             Err(TokenError::UnexpectedToken("💣".to_string())),
-            scanner.next()
+            scanner.scan_token()
         );
     }
 
@@ -471,7 +474,7 @@ mod test {
         let mut scanner = Scanner::new("// This is a comment\nvar x");
         let span = Span { begin: 21, end: 24 };
         let token = Token::new(TokenType::Var, "var", 2, span);
-        assert_eq!(token, scanner.next().unwrap());
+        assert_eq!(token, scanner.scan_token().unwrap());
     }
 
     #[test]
