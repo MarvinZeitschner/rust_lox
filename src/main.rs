@@ -1,7 +1,13 @@
-use printer::AstPrinter;
-use rust_lox::{ast::*, lex::lexer::*, parser::*};
+use std::fs;
 
-#[derive(clap::Parser, Debug)]
+use clap::Parser;
+use rust_lox::{
+    ast::printer::AstPrinter,
+    lex::lexer::Scanner,
+    parser::{self, TokenStream},
+};
+
+#[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
     #[arg(required = true)]
@@ -9,8 +15,12 @@ struct Args {
 }
 
 fn main() {
-    let input = "1 + 2";
-    let mut parser = setup(input);
+    let args = Args::parse();
+    let file_content =
+        &fs::read_to_string(args.path).expect("Should have been able to read the file");
+    let contents = file_content.trim();
+
+    let mut parser = setup(contents);
 
     match parser.parse() {
         Ok(expr) => {
@@ -21,7 +31,7 @@ fn main() {
     }
 }
 
-fn setup(input: &str) -> Parser {
+fn setup(input: &str) -> parser::Parser {
     let mut lexer = Scanner::new(input);
-    Parser::new(TokenStream::new(lexer.scan_tokens().unwrap()))
+    parser::Parser::new(TokenStream::new(lexer.scan_tokens().unwrap()))
 }

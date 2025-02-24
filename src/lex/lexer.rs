@@ -149,6 +149,7 @@ impl<'a> Scanner<'a> {
             let token = self.scan_token()?;
             tokens.push(token);
         }
+        tokens.push(self.make_token(TokenType::EOF));
         Ok(tokens)
     }
 

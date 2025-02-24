@@ -21,11 +21,14 @@ impl<'a> TokenStream<'a> {
     }
 
     fn peek(&self) -> &Token<'a> {
+        if self.position >= self.tokens.len() {
+            panic!("Attempted to peek past the end of tokens");
+        }
         &self.tokens[self.position]
     }
 
     fn is_at_end(&self) -> bool {
-        self.peek().kind == TokenType::EOF
+        self.tokens[self.position].kind == TokenType::EOF
     }
 
     fn previous(&self) -> Token<'a> {
@@ -33,7 +36,7 @@ impl<'a> TokenStream<'a> {
     }
 
     fn advance(&mut self) -> Token<'a> {
-        if !self.is_at_end() {
+        if self.position < self.tokens.len() - 1 {
             self.position += 1;
         }
         self.previous()
@@ -43,7 +46,11 @@ impl<'a> TokenStream<'a> {
         if self.is_at_end() {
             return false;
         }
-        &self.peek().kind == kind
+
+        match (&self.peek().kind, kind) {
+            (TokenType::Number(_), TokenType::Number(_)) => true,
+            _ => &self.peek().kind == kind,
+        }
     }
 
     fn match_l(&mut self, kinds: &[TokenType]) -> bool {
@@ -61,7 +68,7 @@ impl<'a> TokenStream<'a> {
             self.advance();
             return Ok(());
         }
-        Err(ParserError::UnexpectedToken {
+        Err(ParserError::UnmatchedParanthesis {
             token: self.previous(),
         })
     }
@@ -158,7 +165,8 @@ impl<'a> Parser<'a> {
     }
 
     fn primary(&mut self) -> Result<Expr<'a>, ParserError<'a>> {
-        match self.tokenstream.peek().kind {
+        let token = self.tokenstream.advance();
+        match token.kind {
             TokenType::False => Ok(Expr::Literal(ExprLiteral::new(LiteralValue::Bool(false)))),
             TokenType::True => Ok(Expr::Literal(ExprLiteral::new(LiteralValue::Bool(true)))),
             TokenType::Nil => Ok(Expr::Literal(ExprLiteral::new(LiteralValue::Nil))),
@@ -171,41 +179,51 @@ impl<'a> Parser<'a> {
                 self.tokenstream.consume(&TokenType::RightParen)?;
                 return Ok(Expr::Grouping(ExprGrouping::new(Box::new(expr))));
             }
-            _ => Err(ParserError::UnexpectedToken {
-                token: *self.tokenstream.peek(),
-            }),
+            _ => Err(ParserError::UnexpectedToken { token }),
         }
     }
 }
 
-// #[cfg(test)]
-// mod test {
-//     use crate::lex::lexer::{Scanner, Span};
-//
-//     use super::*;
-//     fn setup(input: &str) -> Parser {
-//         let mut lexer = Scanner::new(input);
-//         Parser::new(TokenStream::new(lexer.scan_tokens().unwrap()))
-//     }
-//
-//     #[test]
-//     fn test() {
-//         let input = "1 + 1";
-//         let mut parser = setup(input);
-//
-//         if let Ok(expr) = parser.parse() {
-//             let left = Expr::Literal(ExprLiteral::new(LiteralValue::F64(1.0)));
-//
-//             let span = Span { begin: 0, end: 8 };
-//             let operator = Token::new(TokenType::Number(1234.123), "1234.123", 1, span);
-//
-//             let right = Expr::Literal(ExprLiteral::new(LiteralValue::F64(1.0)));
-//
-//             assert_eq!(Expr::Binary(ExprBinary::new(
-//                 Box::new(left),
-//                 operator,
-//                 Box::new(right)
-//             )))
-//         }
-//     }
-// }
+#[cfg(test)]
+mod test {
+    use crate::lex::lexer::{Scanner, Span};
+
+    use super::*;
+    fn setup(input: &str) -> Parser {
+        let mut lexer = Scanner::new(input);
+        Parser::new(TokenStream::new(lexer.scan_tokens().unwrap()))
+    }
+
+    #[test]
+    fn recursive_descent() {
+        let input = "2 + 3";
+        let mut parser = setup(input);
+
+        if let Ok(expr) = parser.parse() {
+            let left = Expr::Literal(ExprLiteral::new(LiteralValue::F64(2.0)));
+
+            let span = Span { begin: 2, end: 3 };
+            let operator = Token::new(TokenType::Plus, "+", 1, span);
+
+            let right = Expr::Literal(ExprLiteral::new(LiteralValue::F64(3.0)));
+
+            assert_eq!(
+                Expr::Binary(ExprBinary::new(Box::new(left), operator, Box::new(right))),
+                expr
+            );
+        }
+    }
+
+    #[test]
+    fn rd_error() {
+        let input = "(1 + 1";
+        let mut parser = setup(input);
+
+        if let Err(expr) = parser.parse() {
+            let span = Span { begin: 5, end: 6 };
+            let right = Token::new(TokenType::Number(1.0), "1", 1, span);
+
+            assert_eq!(expr, ParserError::UnmatchedParanthesis { token: right });
+        }
+    }
+}
