@@ -182,6 +182,28 @@ impl<'a> Parser<'a> {
             _ => Err(ParserError::UnexpectedToken { token }),
         }
     }
+
+    fn synchronize(&mut self) {
+        self.tokenstream.advance();
+
+        while !self.tokenstream.is_at_end() {
+            if self.tokenstream.previous().kind == TokenType::Semicolon {
+                return;
+            }
+
+            match self.tokenstream.peek().kind {
+                TokenType::Class => return,
+                TokenType::Fun => return,
+                TokenType::Var => return,
+                TokenType::For => return,
+                TokenType::If => return,
+                TokenType::While => return,
+                TokenType::Print => return,
+                TokenType::Return => return,
+                _ => self.tokenstream.advance(),
+            };
+        }
+    }
 }
 
 #[cfg(test)]
