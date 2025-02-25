@@ -2,7 +2,7 @@ pub mod printer;
 
 use ast_macro::Ast;
 
-use crate::lex::lexer::Token;
+use crate::lex::Token;
 
 #[derive(Debug, PartialEq)]
 pub enum LiteralValue {

@@ -3,7 +3,7 @@ use std::fs;
 use clap::Parser;
 use rust_lox::{
     ast::printer::AstPrinter,
-    lex::lexer::Scanner,
+    lex::Scanner,
     parser::{self, TokenStream},
 };
 

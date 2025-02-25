@@ -1,10 +1,10 @@
 pub mod error;
 
-use error::ParserError;
+use error::{ParserError, TokenStreamError};
 
 use crate::{
     ast::{Expr, ExprBinary, ExprGrouping, ExprLiteral, ExprUnary, LiteralValue},
-    lex::lexer::{Token, TokenType},
+    lex::{Token, TokenType},
 };
 
 pub struct TokenStream<'a> {
@@ -20,56 +20,59 @@ impl<'a> TokenStream<'a> {
         }
     }
 
-    fn peek(&self) -> &Token<'a> {
+    fn peek(&self) -> Result<&Token<'a>, TokenStreamError> {
         if self.position >= self.tokens.len() {
-            panic!("Attempted to peek past the end of tokens");
+            return Err(TokenStreamError::OutOfBounds);
         }
-        &self.tokens[self.position]
+        Ok(&self.tokens[self.position])
     }
 
     fn is_at_end(&self) -> bool {
         self.tokens[self.position].kind == TokenType::EOF
     }
 
-    fn previous(&self) -> Token<'a> {
-        self.tokens[self.position - 1]
+    fn previous(&self) -> Result<Token<'a>, TokenStreamError> {
+        if self.position == 0 {
+            return Err(TokenStreamError::OutOfBounds);
+        }
+        Ok(self.tokens[self.position - 1])
     }
 
-    fn advance(&mut self) -> Token<'a> {
+    fn advance(&mut self) -> Result<Token<'a>, TokenStreamError> {
         if self.position < self.tokens.len() - 1 {
             self.position += 1;
         }
         self.previous()
     }
 
-    fn check(&self, kind: &TokenType) -> bool {
+    fn check(&self, kind: &TokenType) -> Result<bool, TokenStreamError> {
         if self.is_at_end() {
-            return false;
+            return Ok(false);
         }
 
-        match (&self.peek().kind, kind) {
-            (TokenType::Number(_), TokenType::Number(_)) => true,
-            _ => &self.peek().kind == kind,
+        match (&self.peek()?.kind, kind) {
+            (TokenType::Number(_), TokenType::Number(_)) => Ok(true),
+            _ => Ok(&self.peek()?.kind == kind),
         }
     }
 
-    fn match_l(&mut self, kinds: &[TokenType]) -> bool {
+    fn match_l(&mut self, kinds: &[TokenType]) -> Result<bool, TokenStreamError> {
         for kind in kinds {
-            if self.check(kind) {
-                self.advance();
-                return true;
+            if self.check(kind)? {
+                self.advance()?;
+                return Ok(true);
             }
         }
-        false
+        Ok(false)
     }
 
     fn consume(&mut self, kind: &TokenType) -> Result<(), ParserError<'a>> {
-        if self.check(kind) {
-            self.advance();
+        if self.check(kind)? {
+            self.advance()?;
             return Ok(());
         }
         Err(ParserError::UnmatchedParanthesis {
-            token: self.previous(),
+            token: self.previous()?,
         })
     }
 }
@@ -96,8 +99,8 @@ impl<'a> Parser<'a> {
 
         let operators = [TokenType::BangEqual, TokenType::EqualEqual];
 
-        while self.tokenstream.match_l(&operators) {
-            let operator = self.tokenstream.previous();
+        while self.tokenstream.match_l(&operators)? {
+            let operator = self.tokenstream.previous()?;
             let right = self.comparison()?;
             expr = Expr::Binary(ExprBinary::new(Box::new(expr), operator, Box::new(right)));
         }
@@ -115,8 +118,8 @@ impl<'a> Parser<'a> {
             TokenType::LessEqual,
         ];
 
-        while self.tokenstream.match_l(&operators) {
-            let operator = self.tokenstream.previous();
+        while self.tokenstream.match_l(&operators)? {
+            let operator = self.tokenstream.previous()?;
             let right = self.term()?;
             expr = Expr::Binary(ExprBinary::new(Box::new(expr), operator, Box::new(right)));
         }
@@ -129,8 +132,8 @@ impl<'a> Parser<'a> {
 
         let operators = [TokenType::Minus, TokenType::Plus];
 
-        while self.tokenstream.match_l(&operators) {
-            let operator = self.tokenstream.previous();
+        while self.tokenstream.match_l(&operators)? {
+            let operator = self.tokenstream.previous()?;
             let right = self.factor()?;
             expr = Expr::Binary(ExprBinary::new(Box::new(expr), operator, Box::new(right)))
         }
@@ -143,8 +146,8 @@ impl<'a> Parser<'a> {
 
         let operators = [TokenType::Slash, TokenType::Star];
 
-        while self.tokenstream.match_l(&operators) {
-            let operator = self.tokenstream.previous();
+        while self.tokenstream.match_l(&operators)? {
+            let operator = self.tokenstream.previous()?;
             let right = self.unary()?;
             expr = Expr::Binary(ExprBinary::new(Box::new(expr), operator, Box::new(right)))
         }
@@ -155,8 +158,8 @@ impl<'a> Parser<'a> {
     fn unary(&mut self) -> Result<Expr<'a>, ParserError<'a>> {
         let operators = [TokenType::Bang, TokenType::Minus];
 
-        if self.tokenstream.match_l(&operators) {
-            let operator = self.tokenstream.previous();
+        if self.tokenstream.match_l(&operators)? {
+            let operator = self.tokenstream.previous()?;
             let right = self.unary()?;
             return Ok(Expr::Unary(ExprUnary::new(operator, Box::new(right))));
         }
@@ -165,14 +168,14 @@ impl<'a> Parser<'a> {
     }
 
     fn primary(&mut self) -> Result<Expr<'a>, ParserError<'a>> {
-        let token = self.tokenstream.advance();
+        let token = self.tokenstream.advance()?;
         match token.kind {
             TokenType::False => Ok(Expr::Literal(ExprLiteral::new(LiteralValue::Bool(false)))),
             TokenType::True => Ok(Expr::Literal(ExprLiteral::new(LiteralValue::Bool(true)))),
             TokenType::Nil => Ok(Expr::Literal(ExprLiteral::new(LiteralValue::Nil))),
             TokenType::Number(val) => Ok(Expr::Literal(ExprLiteral::new(LiteralValue::F64(val)))),
             TokenType::String => Ok(Expr::Literal(ExprLiteral::new(LiteralValue::String(
-                self.tokenstream.previous().lexeme.to_string(),
+                self.tokenstream.previous()?.lexeme.to_string(),
             )))),
             TokenType::LeftParen => {
                 let expr = self.expression()?;
@@ -183,37 +186,51 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn synchronize(&mut self) {
-        self.tokenstream.advance();
+    fn synchronize(&mut self) -> Result<(), ParserError> {
+        self.tokenstream.advance()?;
 
         while !self.tokenstream.is_at_end() {
-            if self.tokenstream.previous().kind == TokenType::Semicolon {
-                return;
+            if self.tokenstream.previous()?.kind == TokenType::Semicolon {
+                return Ok(());
             }
 
-            match self.tokenstream.peek().kind {
-                TokenType::Class => return,
-                TokenType::Fun => return,
-                TokenType::Var => return,
-                TokenType::For => return,
-                TokenType::If => return,
-                TokenType::While => return,
-                TokenType::Print => return,
-                TokenType::Return => return,
-                _ => self.tokenstream.advance(),
+            match self.tokenstream.peek()?.kind {
+                TokenType::Class => (),
+                TokenType::Fun => (),
+                TokenType::Var => (),
+                TokenType::For => (),
+                TokenType::If => (),
+                TokenType::While => (),
+                TokenType::Print => (),
+                TokenType::Return => (),
+                _ => {
+                    self.tokenstream.advance()?;
+                    return Ok(());
+                }
             };
         }
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::lex::lexer::{Scanner, Span};
+    use crate::lex::{Scanner, Span};
 
     use super::*;
     fn setup(input: &str) -> Parser {
         let mut lexer = Scanner::new(input);
         Parser::new(TokenStream::new(lexer.scan_tokens().unwrap()))
+    }
+
+    #[test]
+    fn ts_error() {
+        let input = "2 + 3";
+        let mut lexer = Scanner::new(input);
+        let ts = TokenStream::new(lexer.scan_tokens().unwrap());
+        let res = ts.previous();
+
+        assert_eq!(Err(TokenStreamError::OutOfBounds), res);
     }
 
     #[test]

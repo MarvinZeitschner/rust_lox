@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::lex::lexer::Token;
+use crate::lex::Token;
 
 #[derive(Error, Debug, PartialEq, PartialOrd, Clone, Copy)]
 pub enum ParserError<'a> {
@@ -15,4 +15,13 @@ pub enum ParserError<'a> {
 
     #[error("[line {}] Error: Unexpected end of file", token.line)]
     UnexpectedEOF { token: Token<'a> },
+
+    #[error("{0}")]
+    TokenStream(#[from] TokenStreamError),
+}
+
+#[derive(Error, Debug, PartialEq, PartialOrd, Clone, Copy)]
+pub enum TokenStreamError {
+    #[error("Internal Parser Error")]
+    OutOfBounds,
 }
