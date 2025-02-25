@@ -50,10 +50,7 @@ impl<'a> TokenStream<'a> {
             return Ok(false);
         }
 
-        match (&self.peek()?.kind, kind) {
-            (TokenType::Number(_), TokenType::Number(_)) => Ok(true),
-            _ => Ok(&self.peek()?.kind == kind),
-        }
+        Ok(&self.peek()?.kind == kind)
     }
 
     fn match_l(&mut self, kinds: &[TokenType]) -> Result<bool, TokenStreamError> {
