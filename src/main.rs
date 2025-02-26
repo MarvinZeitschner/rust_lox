@@ -2,7 +2,7 @@ use std::fs;
 
 use clap::Parser;
 use rust_lox::{
-    ast::printer::AstPrinter,
+    interpreter::Interpreter,
     lex::Scanner,
     parser::{self, TokenStream},
 };
@@ -16,15 +16,15 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
-    let file_content =
-        &fs::read_to_string(args.path).expect("Should have been able to read the file");
+    let file_content = &fs::read_to_string(args.path.clone())
+        .unwrap_or_else(|_| panic!("Failed to read file: {}", args.path));
     let contents = file_content.trim();
 
     let mut parser = setup(contents);
 
     match parser.parse() {
         Ok(expr) => {
-            let res = expr.accept(&mut AstPrinter);
+            let res = expr.accept(&mut Interpreter);
             println!("{:#?}", res);
         }
         Err(e) => println!("{}", e),
