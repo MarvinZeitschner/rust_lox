@@ -96,7 +96,14 @@ impl Add for Value {
     }
 }
 
+#[derive(Default)]
 pub struct Interpreter;
+
+impl Interpreter {
+    fn evaluate(&mut self, expr: &Expr) -> Value {
+        expr.accept(self)
+    }
+}
 
 impl<'a> Visitor<'a, Value> for Interpreter {
     fn visit_literal(&mut self, node: &ExprLiteral) -> Value {
@@ -132,8 +139,53 @@ impl<'a> Visitor<'a, Value> for Interpreter {
             TokenType::Less => Value::Boolean(left < right),
             TokenType::GreaterEqual => Value::Boolean(left >= right),
             TokenType::LessEqual => Value::Boolean(left <= right),
-            // TODO: Add rest of operators
+            TokenType::EqualEqual => Value::Boolean(left == right),
+            TokenType::BangEqual => Value::Boolean(left != right),
             _ => Value::Nil,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::lex::{Span, Token};
+
+    use super::*;
+
+    #[test]
+    fn literal() {
+        let mut interpreter = Interpreter;
+
+        let expr = Expr::Literal(ExprLiteral::new(LiteralValue::F64(1.0)));
+        let result = interpreter.evaluate(&expr);
+
+        assert_eq!(result, Value::Number(1.0));
+    }
+
+    #[test]
+    fn grouping() {
+        let mut interpreter = Interpreter;
+
+        let expr = Expr::Grouping(ExprGrouping::new(Box::new(Expr::Literal(
+            ExprLiteral::new(LiteralValue::F64(1.0)),
+        ))));
+        let result = interpreter.evaluate(&expr);
+
+        assert_eq!(result, Value::Number(1.0));
+    }
+
+    #[test]
+    fn unary() {
+        let mut interpreter = Interpreter;
+
+        let span = Span { begin: 0, end: 1 };
+        let token = Token::new(TokenType::Minus, "-", 1, span);
+        let expr = Expr::Unary(ExprUnary::new(
+            token,
+            Box::new(Expr::Literal(ExprLiteral::new(LiteralValue::F64(1.0)))),
+        ));
+        let result = interpreter.evaluate(&expr);
+
+        assert_eq!(result, Value::Number(-1.0));
     }
 }
