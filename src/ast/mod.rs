@@ -2,7 +2,7 @@ pub mod printer;
 
 use ast_macro::Ast;
 
-use crate::{interpreter::Value, lex::Token};
+use crate::lex::Token;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum LiteralValue {
@@ -14,11 +14,11 @@ pub enum LiteralValue {
 
 #[derive(Ast, Debug, PartialEq)]
 pub enum Expression<'a> {
-    Literal {
-        value: LiteralValue,
-    },
     Grouping {
         value: Box<Expr<'a>>,
+    },
+    Literal {
+        value: LiteralValue,
     },
     Unary {
         operator: Token<'a>,

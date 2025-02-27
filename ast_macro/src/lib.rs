@@ -1,155 +1,80 @@
-use proc_macro::TokenStream;
-use quote::{format_ident, quote};
-use syn::{parse_macro_input, Data, DeriveInput, Fields, GenericParam, Type};
+use std::cell::RefCell;
 
-fn type_needs_lifetime(ty: &Type) -> bool {
+use quote::{format_ident, quote, ToTokens};
+use syn::{parse_macro_input, Data, DeriveInput, Fields, FieldsNamed, Type, Variant};
+
+fn innermost_type(ty: &Type) -> &Type {
     match ty {
-        Type::Reference(_) => true,
-        Type::Path(type_path) => {
-            let last_segment = type_path.path.segments.last().unwrap();
-            last_segment.ident == "Box" || last_segment.ident == "Expr"
-        }
-        _ => false,
+        Type::Path(_) => ty,
+        Type::Group(group) => innermost_type(&group.elem),
+        Type::Paren(paren) => innermost_type(&paren.elem),
+        Type::Reference(reference) => innermost_type(&reference.elem),
+        Type::Array(array) => innermost_type(&array.elem),
+        Type::Tuple(tuple) if !tuple.elems.is_empty() => innermost_type(&tuple.elems[0]),
+        Type::Infer(_) => ty,
+        _ => ty,
     }
 }
+fn struct_defs(variant: &Variant, fields: &FieldsNamed) -> proc_macro2::TokenStream {
+    let name = &variant.ident;
+    let formated_name = format_ident!("Expr{}", name);
+    let internal_lifetime = RefCell::new(quote! {});
 
-fn struct_needs_lifetime(fields: &Fields) -> bool {
-    fields.iter().any(|field| type_needs_lifetime(&field.ty))
+    let struct_fields = fields
+        .named
+        .iter()
+        .map(|field| {
+            let name = field.ident.as_ref().unwrap();
+            let ty = &field.ty;
+            let ty = innermost_type(ty);
+            panic!("{}", ty.to_token_stream().to_string());
+            let lt = match ty {
+                Type::Reference(ty) => match &ty.lifetime {
+                    Some(lt) => {
+                        internal_lifetime.replace(quote! { <#lt> });
+                        quote! { <#lt> }
+                    }
+                    None => quote! {},
+                },
+                _ => quote! {},
+            };
+            quote! { pub #name: #ty #lt }
+        })
+        .collect::<Vec<_>>();
+
+    let lt = internal_lifetime.borrow().clone();
+    // panic!("{}", lt);
+
+    quote! {
+        #[derive(Debug, PartialEq, Clone)]
+        pub struct #formated_name #lt {
+            #(#struct_fields),*
+        }
+    }
 }
 
 #[proc_macro_derive(Ast)]
-pub fn ast_derive(input: TokenStream) -> TokenStream {
+pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    if input.ident == format_ident!("Expr") {
-        panic!("Enum can't be named Expr, since it generates this enum");
-    }
 
-    let name = format_ident!("Expr");
-    let vis = &input.vis;
-    let has_lifetime = input
-        .generics
-        .params
-        .iter()
-        .any(|param| matches!(param, GenericParam::Lifetime(_)));
-
-    let high_lt = if has_lifetime {
-        quote! { <'a> }
-    } else {
-        quote! {}
-    };
-    let high_lt_comma = if has_lifetime {
-        quote! { 'a, }
-    } else {
-        quote! {}
+    let Data::Enum(data) = input.data else {
+        panic!("#[derive(AST)] can only be used on enums");
     };
 
-    let Data::Enum(data_enum) = input.data else {
-        panic!("#[derive(Ast)] can only be used on enums");
-    };
+    let mut structs: Vec<proc_macro2::TokenStream> = vec![];
 
-    let mut structs = vec![];
-    let mut enum_variants = vec![];
-    let mut visitor_methods = vec![];
-    let mut accept_match_arms = vec![];
-
-    for variant in &data_enum.variants {
-        let variant_name = &variant.ident;
+    for variant in &data.variants {
         let Fields::Named(fields) = &variant.fields else {
             panic!("Enum variants must have named fields");
         };
-
-        let struct_name = format_ident!("{}{}", name, variant_name);
-        let needs_lifetime = struct_needs_lifetime(&variant.fields);
-
-        let lifetime_param = if !has_lifetime {
-            quote! {}
-        } else if needs_lifetime {
-            quote! { <'a> }
-        } else {
-            quote! {}
-        };
-
-        let struct_fields = fields.named.iter().map(|f| {
-            let field_name = &f.ident;
-            let field_type = &f.ty;
-            quote! { #vis #field_name: #field_type }
-        });
-
-        let field_names = fields
-            .named
-            .iter()
-            .map(|f| f.ident.clone().unwrap())
-            .collect::<Vec<_>>();
-
-        let field_types = fields
-            .named
-            .iter()
-            .map(|f| f.ty.clone())
-            .collect::<Vec<_>>();
-
-        let visitor_method_name =
-            format_ident!("visit_{}", variant_name.to_string().to_lowercase());
-
-        visitor_methods.push(quote! {
-            fn #visitor_method_name(&mut self, node: &#struct_name #lifetime_param) -> T;
-        });
-
-        accept_match_arms.push(quote! {
-            Self::#variant_name(node) => visitor.#visitor_method_name(node)
-        });
-
-        structs.push(quote! {
-            #[derive(Debug, PartialEq)]
-            #vis struct #struct_name #lifetime_param {
-                #(#struct_fields),*
-            }
-
-            impl #lifetime_param #struct_name #lifetime_param {
-                #vis fn new(#(#field_names: #field_types),*) -> Self {
-                    Self {
-                        #(#field_names),*
-                    }
-                }
-            }
-        });
-
-        enum_variants.push(if needs_lifetime {
-            quote! { #variant_name(#struct_name #lifetime_param) }
-        } else {
-            quote! { #variant_name(#struct_name) }
-        });
+        structs.push(struct_defs(variant, fields));
     }
 
-    let visitor_name = format_ident!("Visitor");
-
-    let visitor_trait = quote! {
-        pub trait #visitor_name<#high_lt_comma T> {
-            #(#visitor_methods)*
-        }
-    };
-
-    let expr_enum = quote! {
-        #[derive(Debug, PartialEq)]
-        #vis enum #name #high_lt {
-            #(#enum_variants),*
-        }
-
-        impl #high_lt #name #high_lt {
-            #vis fn accept<T, V: #visitor_name<#high_lt_comma T>>(&self, visitor: &mut V) -> T {
-                match self {
-                    #(#accept_match_arms),*
-                }
-            }
-        }
-    };
-
     let expanded = quote! {
-        #visitor_trait
-
         #(#structs)*
-
-        #expr_enum
     };
 
-    TokenStream::from(expanded)
+    panic!("{}", expanded);
+
+    expanded.into()
 }
