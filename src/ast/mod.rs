@@ -30,3 +30,15 @@ pub enum Expression<'a> {
         right: Box<Expr<'a>>,
     },
 }
+
+// #[derive(Ast)]
+// pub enum Expression {
+//     Literal {
+//         value: LiteralValue,
+//     },
+//     Binary {
+//         left: Box<Expr>,
+//         operator: String,
+//         right: Box<Expr>,
+//     },
+// }

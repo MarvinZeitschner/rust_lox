@@ -26,12 +26,31 @@ pub fn struct_defs(variant: &Variant, fields: &FieldsNamed) -> proc_macro2::Toke
         })
         .collect::<Vec<_>>();
 
+    let field_names = fields
+        .named
+        .iter()
+        .map(|f| f.ident.clone().unwrap())
+        .collect::<Vec<_>>();
+
+    let field_types = fields
+        .named
+        .iter()
+        .map(|f| f.ty.clone())
+        .collect::<Vec<_>>();
+
     let lt = internal_lifetime.borrow().clone();
 
     quote! {
         #[derive(Debug, PartialEq, Clone)]
         pub struct #formated_name #lt {
             #(#struct_fields),*
+        }
+        impl #lt #formated_name #lt {
+            pub fn new(#(#field_names: #field_types),*) -> Self {
+                Self {
+                    #(#field_names),*
+                }
+            }
         }
     }
 }
