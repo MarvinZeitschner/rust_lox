@@ -1,20 +1,48 @@
 use std::cell::RefCell;
 
 use quote::{format_ident, quote, ToTokens};
-use syn::{parse_macro_input, Data, DeriveInput, Fields, FieldsNamed, Type, Variant};
+use syn::{
+    parse_macro_input, Data, DeriveInput, Fields, FieldsNamed, GenericArgument, Lifetime,
+    PathArguments, Type, Variant,
+};
 
-fn innermost_type(ty: &Type) -> &Type {
+fn extract_lifetime(ty: &syn::Type) -> Option<&Lifetime> {
     match ty {
-        Type::Path(_) => ty,
-        Type::Group(group) => innermost_type(&group.elem),
-        Type::Paren(paren) => innermost_type(&paren.elem),
-        Type::Reference(reference) => innermost_type(&reference.elem),
-        Type::Array(array) => innermost_type(&array.elem),
-        Type::Tuple(tuple) if !tuple.elems.is_empty() => innermost_type(&tuple.elems[0]),
-        Type::Infer(_) => ty,
-        _ => ty,
+        syn::Type::Path(type_path) if !type_path.path.segments.is_empty() => {
+            let last_segment = type_path.path.segments.last().unwrap();
+
+            if let syn::PathArguments::AngleBracketed(args) = &last_segment.arguments {
+                for arg in &args.args {
+                    if let syn::GenericArgument::Lifetime(lifetime) = arg {
+                        return Some(lifetime);
+                    }
+                }
+            }
+            None
+        }
+        syn::Type::Reference(type_ref) => type_ref.lifetime.as_ref(),
+        _ => None,
     }
 }
+fn innermost_type(ty: &Type) -> &Type {
+    match ty {
+        Type::Path(type_path) => {
+            if let Some(segment) = type_path.path.segments.last() {
+                if let PathArguments::AngleBracketed(ref args) = segment.arguments {
+                    for arg in &args.args {
+                        if let GenericArgument::Type(inner_ty) = arg {
+                            return innermost_type(inner_ty);
+                        }
+                    }
+                }
+            }
+            ty
+        }
+        Type::Reference(reference) => innermost_type(&reference.elem),
+        _ => panic!("Unexpected type: {:?}", ty.to_token_stream().to_string()),
+    }
+}
+
 fn struct_defs(variant: &Variant, fields: &FieldsNamed) -> proc_macro2::TokenStream {
     let name = &variant.ident;
     let formated_name = format_ident!("Expr{}", name);
@@ -27,23 +55,16 @@ fn struct_defs(variant: &Variant, fields: &FieldsNamed) -> proc_macro2::TokenStr
             let name = field.ident.as_ref().unwrap();
             let ty = &field.ty;
             let ty = innermost_type(ty);
-            panic!("{}", ty.to_token_stream().to_string());
-            let lt = match ty {
-                Type::Reference(ty) => match &ty.lifetime {
-                    Some(lt) => {
-                        internal_lifetime.replace(quote! { <#lt> });
-                        quote! { <#lt> }
-                    }
-                    None => quote! {},
-                },
-                _ => quote! {},
+            let lt = match extract_lifetime(ty) {
+                Some(lt) => quote! { <#lt> },
+                None => quote! {},
             };
-            quote! { pub #name: #ty #lt }
+            *internal_lifetime.borrow_mut() = lt.clone();
+            quote! { pub #name: #ty }
         })
         .collect::<Vec<_>>();
 
     let lt = internal_lifetime.borrow().clone();
-    // panic!("{}", lt);
 
     quote! {
         #[derive(Debug, PartialEq, Clone)]
@@ -74,7 +95,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         #(#structs)*
     };
 
-    panic!("{}", expanded);
+    // panic!("{}", expanded);
 
     expanded.into()
 }
