@@ -22,6 +22,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let enum_lifetime: RefCell<Option<&Lifetime>> = RefCell::new(None);
 
     let mut visitor_methods: Vec<proc_macro2::TokenStream> = vec![];
+    let mut accept_methods: Vec<proc_macro2::TokenStream> = vec![];
 
     for variant in &data.variants {
         let Fields::Named(fields) = &variant.fields else {
@@ -34,6 +35,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         enum_lifetime.replace(en_lt);
 
         visitor_methods.push(visitor::visitor_method(variant, en_lt));
+        accept_methods.push(visitor::accept_method(variant));
     }
 
     let enum_name = format_ident!("Expr");
@@ -45,7 +47,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         }
     };
 
-    let enum_lifetime = match enum_lifetime {
+    let enum_lifetime_tokenstream = match enum_lifetime {
         Some(lt) => quote! { <#lt> },
         None => quote! {},
     };
@@ -54,8 +56,16 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         #visitor_trait
 
         #[derive(Debug, PartialEq, Clone)]
-        pub enum #enum_name #enum_lifetime {
+        pub enum #enum_name #enum_lifetime_tokenstream {
             #(#enum_variants),*
+        }
+
+        impl #enum_lifetime_tokenstream #enum_name #enum_lifetime_tokenstream {
+            pub fn accept<T, V: Visitor<#enum_lifetime, T>>(&self, visitor: &mut V) -> T {
+                match self {
+                    #(#accept_methods),*
+                }
+            }
         }
 
         #(#structs)*
