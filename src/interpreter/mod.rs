@@ -47,8 +47,6 @@ impl Not for Value {
 impl Sub for Value {
     type Output = Self;
 
-    // TODO: Should strings be parsed?
-    // if so: implement error handling for parsing fail
     fn sub(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
             (Value::Number(l), Value::Number(r)) => Value::Number(l - r),
@@ -60,8 +58,6 @@ impl Sub for Value {
 impl Div for Value {
     type Output = Self;
 
-    // TODO: Should strings be parsed?
-    // if so: implement error handling for parsing fail
     fn div(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
             (Value::Number(l), Value::Number(r)) => Value::Number(l / r),
@@ -73,8 +69,6 @@ impl Div for Value {
 impl Mul for Value {
     type Output = Self;
 
-    // TODO: Should strings be parsed?
-    // if so: implement error handling for parsing fail
     fn mul(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
             (Value::Number(l), Value::Number(r)) => Value::Number(l * r),
@@ -105,16 +99,18 @@ impl Interpreter {
     }
 }
 
-impl<'a> Visitor<'a, Value> for Interpreter {
-    fn visit_literal(&mut self, node: &ExprLiteral) -> Value {
+impl Visitor for Interpreter {
+    type Output = Value;
+
+    fn visit_literal(&mut self, node: &ExprLiteral) -> Self::Output {
         node.value.clone().into()
     }
 
-    fn visit_grouping(&mut self, node: &ExprGrouping<'a>) -> Value {
+    fn visit_grouping(&mut self, node: &ExprGrouping) -> Self::Output {
         node.value.accept(self)
     }
 
-    fn visit_unary(&mut self, node: &ExprUnary<'a>) -> Value {
+    fn visit_unary(&mut self, node: &ExprUnary) -> Self::Output {
         let right = node.value.accept(self);
 
         match node.operator.kind {
@@ -124,7 +120,7 @@ impl<'a> Visitor<'a, Value> for Interpreter {
         }
     }
 
-    fn visit_binary(&mut self, node: &ExprBinary<'a>) -> Value {
+    fn visit_binary(&mut self, node: &ExprBinary) -> Self::Output {
         let left = node.left.accept(self);
         let right = node.right.accept(self);
 
@@ -133,8 +129,6 @@ impl<'a> Visitor<'a, Value> for Interpreter {
             TokenType::Slash => left / right,
             TokenType::Star => left * right,
             TokenType::Plus => left + right,
-            // TODO: Check if derive handles values correctly, otherwise implement PartialEq and
-            // PartialOrd
             TokenType::Greater => Value::Boolean(left > right),
             TokenType::Less => Value::Boolean(left < right),
             TokenType::GreaterEqual => Value::Boolean(left >= right),
