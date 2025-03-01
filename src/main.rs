@@ -24,13 +24,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match parser.parse() {
         Ok(expr) => match expr.accept(&mut Interpreter) {
             Ok(res) => {
-                println!("{:#?}", res);
+                println!("{}", res);
                 Ok(())
             }
-            Err(e) => {
-                // println!("RuntimeError: {}", e);
-                Err(e.to_string().into())
-            }
+            Err(e) => Err(e.to_string().into()),
         },
         Err(e) => {
             println!("ParserError: {}", e);

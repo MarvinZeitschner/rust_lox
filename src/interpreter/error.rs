@@ -8,7 +8,7 @@ pub enum RuntimeError<'a> {
     NumberOperand { operator: Token<'a> },
 
     #[error("[line {}] Operands must be a number", operator.line)]
-    MoreNumberOperands { operator: Token<'a> },
+    MutlipleNumberOperands { operator: Token<'a> },
 
     #[error("[line {}] Operands must be two numbers or two strings", operator.line)]
     NumberOrStringOperands { operator: Token<'a> },

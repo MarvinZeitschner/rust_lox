@@ -1,5 +1,10 @@
 pub mod error;
 
+use std::{
+    fmt::Display,
+    ops::{Add, Div, Mul, Neg, Not, Sub},
+};
+
 use error::RuntimeError;
 
 use crate::{
@@ -7,7 +12,7 @@ use crate::{
     lex::{Token, TokenType},
 };
 
-#[derive(Debug, PartialEq, PartialOrd)]
+#[derive(Debug)]
 pub enum Value {
     Number(f64),
     String(String),
@@ -15,96 +20,95 @@ pub enum Value {
     Nil,
 }
 
-impl<'a> Value {
-    fn neg(self, operator: Token<'a>) -> Result<Value, RuntimeError<'a>> {
+impl Neg for Value {
+    type Output = Self;
+
+    fn neg(self) -> Self {
         match self {
-            Value::Number(n) => Ok(Value::Number(-n)),
-            _ => Err(RuntimeError::NumberOperand { operator }),
+            Value::Number(n) => Value::Number(-n),
+            _ => Value::Nil,
         }
     }
-    fn not(self, operator: Token<'a>) -> Result<Value, RuntimeError<'a>> {
+}
+
+impl Not for Value {
+    type Output = Self;
+
+    fn not(self) -> Self {
         match self {
-            Value::Boolean(b) => Ok(Value::Boolean(!b)),
-            _ => Err(RuntimeError::NumberOperand { operator }),
+            Value::Boolean(b) => Value::Boolean(!b),
+            Value::Number(_) => Value::Boolean(false),
+            Value::String(_) => Value::Boolean(false),
+            Value::Nil => Value::Boolean(true),
         }
     }
+}
 
-    fn add(self, other: Value, operator: Token<'a>) -> Result<Value, RuntimeError<'a>> {
-        match (self, other) {
-            (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left + right)),
-            (Value::String(left), Value::String(right)) => {
-                Ok(Value::String(format!("{}{}", left, right)))
-            }
-            _ => Err(RuntimeError::NumberOrStringOperands { operator }),
+impl Add for Value {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Value::Number(l), Value::Number(r)) => Value::Number(l + r),
+            (Value::String(l), Value::String(r)) => Value::String(l + &r),
+            _ => Value::Nil,
         }
     }
+}
 
-    fn sub(self, other: Value, operator: Token<'a>) -> Result<Value, RuntimeError<'a>> {
-        match (self, other) {
-            (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left - right)),
-            _ => Err(RuntimeError::NumberOperand { operator }),
+impl Sub for Value {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Value::Number(l), Value::Number(r)) => Value::Number(l - r),
+            _ => Value::Nil,
         }
     }
+}
 
-    fn div(self, other: Value, operator: Token<'a>) -> Result<Value, RuntimeError<'a>> {
-        match (self, other) {
-            (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left / right)),
-            _ => Err(RuntimeError::NumberOperand { operator }),
+impl Div for Value {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Value::Number(l), Value::Number(r)) => Value::Number(l / r),
+            _ => Value::Nil,
         }
     }
+}
 
-    fn mul(self, other: Value, operator: Token<'a>) -> Result<Value, RuntimeError<'a>> {
-        match (self, other) {
-            (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left * right)),
-            _ => Err(RuntimeError::NumberOperand { operator }),
+impl Mul for Value {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Value::Number(l), Value::Number(r)) => Value::Number(l * r),
+            _ => Value::Nil,
         }
     }
+}
 
-    fn lt(self, other: Value, operator: Token<'a>) -> Result<Value, RuntimeError<'a>> {
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Value::Number(left), Value::Number(right)) => Ok(Value::Boolean(left < right)),
-            _ => Err(RuntimeError::NumberOperand { operator }),
+            (Value::Number(l), Value::Number(r)) => l == r,
+            (Value::String(l), Value::String(r)) => l == r,
+            (Value::Boolean(l), Value::Boolean(r)) => l == r,
+            (Value::Nil, Value::Nil) => true,
+            _ => false,
         }
     }
+}
 
-    fn gt(self, other: Value, operator: Token<'a>) -> Result<Value, RuntimeError<'a>> {
+impl PartialOrd for Value {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         match (self, other) {
-            (Value::Number(left), Value::Number(right)) => Ok(Value::Boolean(left > right)),
-            _ => Err(RuntimeError::NumberOperand { operator }),
-        }
-    }
-
-    fn le(self, other: Value, operator: Token<'a>) -> Result<Value, RuntimeError<'a>> {
-        match (self, other) {
-            (Value::Number(left), Value::Number(right)) => Ok(Value::Boolean(left <= right)),
-            _ => Err(RuntimeError::NumberOperand { operator }),
-        }
-    }
-
-    fn ge(self, other: Value, operator: Token<'a>) -> Result<Value, RuntimeError<'a>> {
-        match (self, other) {
-            (Value::Number(left), Value::Number(right)) => Ok(Value::Boolean(left >= right)),
-            _ => Err(RuntimeError::NumberOperand { operator }),
-        }
-    }
-
-    fn eq(self, other: Value, operator: Token<'a>) -> Result<Value, RuntimeError<'a>> {
-        match (self, other) {
-            (Value::Number(left), Value::Number(right)) => Ok(Value::Boolean(left == right)),
-            (Value::String(left), Value::String(right)) => Ok(Value::Boolean(left == right)),
-            (Value::Boolean(left), Value::Boolean(right)) => Ok(Value::Boolean(left == right)),
-            (Value::Nil, Value::Nil) => Ok(Value::Boolean(true)),
-            _ => Ok(Value::Boolean(false)),
-        }
-    }
-
-    fn ne(self, other: Value, operator: Token<'a>) -> Result<Value, RuntimeError<'a>> {
-        match (self, other) {
-            (Value::Number(left), Value::Number(right)) => Ok(Value::Boolean(left != right)),
-            (Value::String(left), Value::String(right)) => Ok(Value::Boolean(left != right)),
-            (Value::Boolean(left), Value::Boolean(right)) => Ok(Value::Boolean(left != right)),
-            (Value::Nil, Value::Nil) => Ok(Value::Boolean(false)),
-            _ => Ok(Value::Boolean(true)),
+            (Value::Number(l), Value::Number(r)) => l.partial_cmp(r),
+            (Value::String(l), Value::String(r)) => l.partial_cmp(r),
+            (Value::Boolean(l), Value::Boolean(r)) => l.partial_cmp(r),
+            (Value::Nil, Value::Nil) => Some(std::cmp::Ordering::Equal),
+            _ => None,
         }
     }
 }
@@ -120,12 +124,46 @@ impl From<LiteralValue> for Value {
     }
 }
 
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::Number(n) => write!(f, "{}", n),
+            Value::String(s) => write!(f, "{}", s),
+            Value::Boolean(b) => write!(f, "{}", b),
+            Value::Nil => write!(f, "nil"),
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct Interpreter;
 
 impl<'a> Interpreter {
     fn evaluate(&mut self, expr: &Expr<'a>) -> Result<Value, RuntimeError<'a>> {
         expr.accept(self)
+    }
+
+    fn check_number_operand(
+        &self,
+        value: &Value,
+        operator: Token<'a>,
+    ) -> Result<(), RuntimeError<'a>> {
+        match value {
+            Value::Number(_) => Ok(()),
+            _ => Err(RuntimeError::NumberOperand { operator }),
+        }
+    }
+
+    fn check_number_operands(
+        &self,
+        left: &Value,
+        right: &Value,
+        operator: Token<'a>,
+    ) -> Result<(), RuntimeError<'a>> {
+        match (left, right) {
+            (Value::Number(_), Value::Number(_)) => Ok(()),
+            _ => Err(RuntimeError::MutlipleNumberOperands { operator }),
+        }
     }
 }
 
@@ -145,8 +183,14 @@ impl<'a> Visitor<'a> for Interpreter {
         let right = node.value.accept(self)?;
 
         match node.operator.kind {
-            TokenType::Minus => right.neg(operator),
-            TokenType::Bang => right.not(operator),
+            TokenType::Minus => {
+                self.check_number_operand(&right, operator)?;
+                Ok(-right)
+            }
+            TokenType::Bang => {
+                self.check_number_operand(&right, operator)?;
+                Ok(!right)
+            }
             _ => Err(RuntimeError::NumberOperand { operator }),
         }
     }
@@ -157,16 +201,45 @@ impl<'a> Visitor<'a> for Interpreter {
         let right = node.right.accept(self)?;
 
         match node.operator.kind {
-            TokenType::Minus => left.sub(right, operator),
-            TokenType::Slash => left.div(right, operator),
-            TokenType::Star => left.mul(right, operator),
-            TokenType::Plus => left.add(right, operator),
-            TokenType::Greater => left.gt(right, operator),
-            TokenType::Less => left.lt(right, operator),
-            TokenType::GreaterEqual => left.ge(right, operator),
-            TokenType::LessEqual => left.le(right, operator),
-            TokenType::EqualEqual => left.eq(right, operator),
-            TokenType::BangEqual => left.ne(right, operator),
+            TokenType::Minus => {
+                self.check_number_operands(&left, &right, operator)?;
+                Ok(left - right)
+            }
+            TokenType::Slash => {
+                self.check_number_operands(&left, &right, operator)?;
+                Ok(left / right)
+            }
+            TokenType::Star => {
+                self.check_number_operands(&left, &right, operator)?;
+                Ok(left * right)
+            }
+            TokenType::Plus => {
+                if let (Value::String(_), Value::String(_)) = (&left, &right) {
+                    return Ok(left + right);
+                }
+                if let (Value::Number(_), Value::Number(_)) = (&left, &right) {
+                    return Ok(left + right);
+                }
+                Err(RuntimeError::NumberOrStringOperands { operator })
+            }
+            TokenType::Greater => {
+                self.check_number_operands(&left, &right, operator)?;
+                Ok(Value::Boolean(left > right))
+            }
+            TokenType::Less => {
+                self.check_number_operands(&left, &right, operator)?;
+                Ok(Value::Boolean(left < right))
+            }
+            TokenType::GreaterEqual => {
+                self.check_number_operands(&left, &right, operator)?;
+                Ok(Value::Boolean(left >= right))
+            }
+            TokenType::LessEqual => {
+                self.check_number_operands(&left, &right, operator)?;
+                Ok(Value::Boolean(left <= right))
+            }
+            TokenType::EqualEqual => Ok(Value::Boolean(left == right)),
+            TokenType::BangEqual => Ok(Value::Boolean(left != right)),
             _ => Ok(Value::Nil),
         }
     }
