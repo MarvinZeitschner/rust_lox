@@ -1,11 +1,10 @@
-use std::fs;
-
 use clap::Parser;
 use rust_lox::{
     interpreter::Interpreter,
     lex::Scanner,
     parser::{self, TokenStream},
 };
+use std::fs;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -23,14 +22,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut parser = setup(contents);
 
     match parser.parse() {
-        Ok(expr) => {
-            let res = expr.accept(&mut Interpreter)?;
-            println!("{:#?}", res);
-            Ok(())
-        }
+        Ok(expr) => match expr.accept(&mut Interpreter) {
+            Ok(res) => {
+                println!("{:#?}", res);
+                Ok(())
+            }
+            Err(e) => {
+                // println!("RuntimeError: {}", e);
+                Err(e.to_string().into())
+            }
+        },
         Err(e) => {
-            println!("{}", e);
-            // TODO: This is temporary
+            println!("ParserError: {}", e);
             Err(e.to_string().into())
         }
     }

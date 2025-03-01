@@ -34,7 +34,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         enum_variants.push(en_variants);
         enum_lifetime.replace(en_lt);
 
-        visitor_methods.push(visitor::visitor_method(variant));
+        visitor_methods.push(visitor::visitor_method(variant, en_lt));
         accept_methods.push(visitor::accept_method(variant));
     }
 
@@ -47,7 +47,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     };
 
     let visitor_trait = quote! {
-        pub trait Visitor {
+        pub trait Visitor #enum_lifetime_tokenstream {
             type Output;
 
             #(#visitor_methods)*
@@ -63,7 +63,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         }
 
         impl #enum_lifetime_tokenstream #enum_name #enum_lifetime_tokenstream {
-            pub fn accept<V: Visitor>(&self, visitor: &mut V) -> V::Output {
+            pub fn accept<V: Visitor #enum_lifetime_tokenstream>(&self, visitor: &mut V) -> V::Output {
                 match self {
                     #(#accept_methods),*
                 }
