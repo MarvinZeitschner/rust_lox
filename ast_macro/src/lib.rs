@@ -8,7 +8,7 @@ mod structs;
 mod utils;
 mod visitor;
 
-#[proc_macro_derive(Ast)]
+#[proc_macro_derive(Ast, attributes(visitor_no_result))]
 pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
