@@ -14,7 +14,7 @@ struct Args {
     path: String,
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     let file_content = &fs::read_to_string(args.path.clone())
         .unwrap_or_else(|_| panic!("Failed to read file: {}", args.path));
@@ -24,10 +24,15 @@ fn main() {
 
     match parser.parse() {
         Ok(expr) => {
-            let res = expr.accept(&mut Interpreter);
+            let res = expr.accept(&mut Interpreter)?;
             println!("{:#?}", res);
+            Ok(())
         }
-        Err(e) => println!("{}", e),
+        Err(e) => {
+            println!("{}", e);
+            // TODO: This is temporary
+            Err(e.to_string().into())
+        }
     }
 }
 
