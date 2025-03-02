@@ -1,16 +1,33 @@
 use std::cell::RefCell;
 
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, Data, DeriveInput, Fields, Lifetime};
+use syn::{parse_macro_input, Data, DeriveInput, Expr, Fields, Lifetime, Lit};
 
 mod enums;
 mod structs;
 mod utils;
 mod visitor;
 
-#[proc_macro_derive(Ast)]
+#[proc_macro_derive(Ast, attributes(name))]
 pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
+    let mut name = input.ident;
+
+    for attr in input.attrs {
+        if attr.path().is_ident("name") {
+            let tokens = attr.meta.require_name_value().unwrap();
+            let attr_name = &tokens.value;
+            let attr_name = match attr_name {
+                Expr::Lit(lit) => match &lit.lit {
+                    Lit::Str(s) => s.value(),
+                    _ => panic!("Expected a string literal"),
+                },
+                _ => panic!("Expected a string literal"),
+            };
+            name = format_ident!("{}", attr_name);
+            // panic!("Extracted name: {}", name);
+        }
+    }
 
     let Data::Enum(data) = input.data else {
         panic!("#[derive(AST)] can only be used on enums");
@@ -38,7 +55,6 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         accept_methods.push(visitor::accept_method(variant));
     }
 
-    let enum_name = format_ident!("Expr");
     let enum_lifetime = enum_lifetime.clone().into_inner();
 
     let enum_lifetime_tokenstream = match enum_lifetime {
@@ -46,8 +62,10 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         None => quote! {},
     };
 
+    let visitor_name = format_ident!("{}Visitor", name);
+
     let visitor_trait = quote! {
-        pub trait Visitor #enum_lifetime_tokenstream {
+        pub trait #visitor_name #enum_lifetime_tokenstream {
             type Output;
 
             #(#visitor_methods)*
@@ -58,12 +76,12 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         #visitor_trait
 
         #[derive(Debug, PartialEq, Clone)]
-        pub enum #enum_name #enum_lifetime_tokenstream {
+        pub enum #name #enum_lifetime_tokenstream {
             #(#enum_variants),*
         }
 
-        impl #enum_lifetime_tokenstream #enum_name #enum_lifetime_tokenstream {
-            pub fn accept<V: Visitor #enum_lifetime_tokenstream>(&self, visitor: &mut V) -> V::Output {
+        impl #enum_lifetime_tokenstream #name #enum_lifetime_tokenstream {
+            pub fn accept<V: #visitor_name #enum_lifetime_tokenstream>(&self, visitor: &mut V) -> V::Output {
                 match self {
                     #(#accept_methods),*
                 }

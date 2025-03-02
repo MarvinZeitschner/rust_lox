@@ -9,7 +9,7 @@ impl AstPrinter {
     }
 }
 
-impl Visitor<'_> for AstPrinter {
+impl ExprVisitor<'_> for AstPrinter {
     type Output = String;
 
     fn visit_grouping(&mut self, node: &ExprGrouping) -> Self::Output {

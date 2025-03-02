@@ -171,7 +171,7 @@ impl<'a> Interpreter {
     }
 }
 
-impl<'a> Visitor<'a> for Interpreter {
+impl<'a> ExprVisitor<'a> for Interpreter {
     type Output = Result<Value, RuntimeError<'a>>;
 
     fn visit_literal(&mut self, node: &ExprLiteral) -> Self::Output {

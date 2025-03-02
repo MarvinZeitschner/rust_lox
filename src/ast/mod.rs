@@ -13,12 +13,13 @@ pub enum LiteralValue {
 }
 
 #[derive(Ast, Debug, PartialEq)]
+#[name = "Expr"]
 pub enum Expression<'a> {
-    Grouping {
-        value: Box<Expr<'a>>,
-    },
     Literal {
         value: LiteralValue,
+    },
+    Grouping {
+        value: Box<Expr<'a>>,
     },
     Unary {
         operator: Token<'a>,
@@ -29,4 +30,10 @@ pub enum Expression<'a> {
         operator: Token<'a>,
         right: Box<Expr<'a>>,
     },
+}
+
+#[derive(Ast, Debug, PartialEq)]
+#[name = "Stmt"]
+pub enum Statement<'a> {
+    Expression { expr: Expr<'a>, print: Expr<'a> },
 }

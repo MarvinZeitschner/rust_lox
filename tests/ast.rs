@@ -7,6 +7,7 @@ pub enum LiteralValue {
 }
 
 #[derive(Ast)]
+#[name = "Expr"]
 pub enum Expression {
     Literal {
         value: LiteralValue,
@@ -20,7 +21,7 @@ pub enum Expression {
 
 struct Evaluator;
 
-impl Visitor for Evaluator {
+impl ExprVisitor for Evaluator {
     type Output = f64;
 
     fn visit_literal(&mut self, node: &ExprLiteral) -> Self::Output {
@@ -53,7 +54,7 @@ impl AstPrinter {
     }
 }
 
-impl Visitor for AstPrinter {
+impl ExprVisitor for AstPrinter {
     type Output = String;
 
     fn visit_literal(&mut self, node: &ExprLiteral) -> Self::Output {
