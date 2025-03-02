@@ -139,8 +139,15 @@ impl Display for Value {
 pub struct Interpreter;
 
 impl<'a> Interpreter {
-    pub fn interpret(&mut self, expr: &Expr<'a>) -> Result<Value, RuntimeError<'a>> {
-        self.evaluate(expr)
+    pub fn interpret(&mut self, stmts: Vec<Stmt<'a>>) -> Result<(), RuntimeError<'a>> {
+        for stmt in stmts {
+            self.execute(stmt)?;
+        }
+        Ok(())
+    }
+
+    fn execute(&mut self, stmt: Stmt<'a>) -> Result<(), RuntimeError<'a>> {
+        stmt.accept(self)
     }
 
     fn evaluate(&mut self, expr: &Expr<'a>) -> Result<Value, RuntimeError<'a>> {
@@ -179,12 +186,12 @@ impl<'a> ExprVisitor<'a> for Interpreter {
     }
 
     fn visit_grouping(&mut self, node: &ExprGrouping<'a>) -> Self::Output {
-        node.value.accept(self)
+        self.evaluate(&node.value)
     }
 
     fn visit_unary(&mut self, node: &ExprUnary<'a>) -> Self::Output {
         let operator = node.operator;
-        let right = node.value.accept(self)?;
+        let right = self.evaluate(&node.value)?;
 
         match node.operator.kind {
             TokenType::Minus => {
@@ -201,8 +208,8 @@ impl<'a> ExprVisitor<'a> for Interpreter {
 
     fn visit_binary(&mut self, node: &ExprBinary<'a>) -> Self::Output {
         let operator = node.operator;
-        let left = node.left.accept(self)?;
-        let right = node.right.accept(self)?;
+        let left = self.evaluate(&node.left)?;
+        let right = self.evaluate(&node.right)?;
 
         match node.operator.kind {
             TokenType::Minus => {
@@ -246,6 +253,21 @@ impl<'a> ExprVisitor<'a> for Interpreter {
             TokenType::BangEqual => Ok(Value::Boolean(left != right)),
             _ => Ok(Value::Nil),
         }
+    }
+}
+
+impl<'a> StmtVisitor<'a> for Interpreter {
+    type Output = Result<(), RuntimeError<'a>>;
+
+    fn visit_expression(&mut self, node: &StmtExpression<'a>) -> Self::Output {
+        self.evaluate(&node.expr)?;
+        Ok(())
+    }
+
+    fn visit_print(&mut self, node: &StmtPrint<'a>) -> Self::Output {
+        let value = self.evaluate(&node.expr)?;
+        println!("{:#?}", value);
+        Ok(())
     }
 }
 

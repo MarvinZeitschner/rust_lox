@@ -5,6 +5,7 @@ use error::{ParserError, TokenStreamError};
 use crate::{
     ast::{
         Expr, ExprBinary, ExprGrouping, ExprLiteral, ExprUnary, LiteralValue, Stmt, StmtExpression,
+        StmtPrint,
     },
     lex::{Token, TokenType},
 };
@@ -114,7 +115,7 @@ impl<'a> Parser<'a> {
     fn print_statement(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
         let value = self.expression()?;
         self.tokenstream.consume(&TokenType::Semicolon)?;
-        Ok(Stmt::Expression(StmtExpression::new(value)))
+        Ok(Stmt::Print(StmtPrint::new(value)))
     }
 
     fn expression_statement(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
