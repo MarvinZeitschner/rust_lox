@@ -139,6 +139,10 @@ impl Display for Value {
 pub struct Interpreter;
 
 impl<'a> Interpreter {
+    pub fn interpret(&mut self, expr: &Expr<'a>) -> Result<Value, RuntimeError<'a>> {
+        self.evaluate(expr)
+    }
+
     fn evaluate(&mut self, expr: &Expr<'a>) -> Result<Value, RuntimeError<'a>> {
         expr.accept(self)
     }

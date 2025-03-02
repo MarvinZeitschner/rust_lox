@@ -22,13 +22,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut parser = setup(contents);
 
     match parser.parse() {
-        Ok(expr) => match expr.accept(&mut Interpreter) {
-            Ok(res) => {
-                println!("{}", res);
-                Ok(())
+        Ok(expr) => {
+            let mut interpreter = Interpreter;
+            match interpreter.interpret(&expr) {
+                Ok(res) => {
+                    println!("{}", res);
+                    Ok(())
+                }
+                Err(e) => Err(e.to_string().into()),
             }
-            Err(e) => Err(e.to_string().into()),
-        },
+        }
         Err(e) => {
             println!("ParserError: {}", e);
             Err(e.to_string().into())
