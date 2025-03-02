@@ -281,7 +281,7 @@ impl<'a> Scanner<'a> {
     }
     fn identifier(&mut self) -> Token<'a> {
         while let Some(c) = self.peek() {
-            if c.is_whitespace() {
+            if !c.is_alphanumeric() {
                 break;
             }
             self.read_char();
