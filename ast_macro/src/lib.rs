@@ -25,7 +25,6 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 _ => panic!("Expected a string literal"),
             };
             name = format_ident!("{}", attr_name);
-            // panic!("Extracted name: {}", name);
         }
     }
 
@@ -45,13 +44,13 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         let Fields::Named(fields) = &variant.fields else {
             panic!("Enum variants must have named fields");
         };
-        structs.push(structs::struct_defs(variant, fields));
+        structs.push(structs::struct_defs(variant, fields, name.clone()));
 
-        let (en_lt, en_variants) = enums::enum_variants(variant, fields);
+        let (en_lt, en_variants) = enums::enum_variants(variant, fields, name.clone());
         enum_variants.push(en_variants);
         enum_lifetime.replace(en_lt);
 
-        visitor_methods.push(visitor::visitor_method(variant, en_lt));
+        visitor_methods.push(visitor::visitor_method(variant, en_lt, name.clone()));
         accept_methods.push(visitor::accept_method(variant));
     }
 

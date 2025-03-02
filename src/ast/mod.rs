@@ -35,5 +35,6 @@ pub enum Expression<'a> {
 #[derive(Ast, Debug, PartialEq)]
 #[name = "Stmt"]
 pub enum Statement<'a> {
-    Expression { expr: Expr<'a>, print: Expr<'a> },
+    Expression { expr: Expr<'a> },
+    Print { expr: Expr<'a> },
 }

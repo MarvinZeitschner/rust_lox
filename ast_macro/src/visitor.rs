@@ -1,9 +1,9 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::{Lifetime, Variant};
+use syn::{Ident, Lifetime, Variant};
 
-pub fn visitor_method(variant: &Variant, lifetime: Option<&Lifetime>) -> TokenStream {
-    let struct_name = format_ident!("Expr{}", &variant.ident);
+pub fn visitor_method(variant: &Variant, lifetime: Option<&Lifetime>, name: Ident) -> TokenStream {
+    let struct_name = format_ident!("{}{}", name, &variant.ident);
     let visitor_name = format_ident!("visit_{}", &variant.ident.to_string().to_lowercase());
 
     let lt = match lifetime {

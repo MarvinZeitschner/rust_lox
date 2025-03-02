@@ -10,6 +10,9 @@ pub enum ParserError<'a> {
     #[error("[line {}] Error: Expected expression", token.line)]
     ExpectedExpression { token: Token<'a> },
 
+    #[error("[line {}] Error: Expected semicolon", token.line)]
+    ExpectedSemicolon { token: Token<'a> },
+
     #[error("[line {}] Error: Unexpected token: {}", token.line, token.lexeme)]
     UnexpectedToken { token: Token<'a> },
 

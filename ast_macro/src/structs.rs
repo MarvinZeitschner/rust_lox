@@ -1,13 +1,16 @@
 use std::cell::RefCell;
 
 use quote::{format_ident, quote};
-use syn::{FieldsNamed, Variant};
+use syn::{FieldsNamed, Ident, Variant};
 
 use crate::utils::{extract_lifetime::extract_lifetime, innermost_ty::innermost_type};
 
-pub fn struct_defs(variant: &Variant, fields: &FieldsNamed) -> proc_macro2::TokenStream {
-    let name = &variant.ident;
-    let formated_name = format_ident!("Expr{}", name);
+pub fn struct_defs(
+    variant: &Variant,
+    fields: &FieldsNamed,
+    name: Ident,
+) -> proc_macro2::TokenStream {
+    let name = format_ident!("{}{}", name, &variant.ident);
     let internal_lifetime = RefCell::new(quote! {});
 
     let struct_fields = fields
@@ -42,10 +45,10 @@ pub fn struct_defs(variant: &Variant, fields: &FieldsNamed) -> proc_macro2::Toke
 
     quote! {
         #[derive(Debug, PartialEq, Clone)]
-        pub struct #formated_name #lt {
+        pub struct #name #lt {
             #(#struct_fields),*
         }
-        impl #lt #formated_name #lt {
+        impl #lt #name #lt {
             pub fn new(#(#field_names: #field_types),*) -> Self {
                 Self {
                     #(#field_names),*

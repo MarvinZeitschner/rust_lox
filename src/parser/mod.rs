@@ -3,7 +3,9 @@ pub mod error;
 use error::{ParserError, TokenStreamError};
 
 use crate::{
-    ast::{Expr, ExprBinary, ExprGrouping, ExprLiteral, ExprUnary, LiteralValue},
+    ast::{
+        Expr, ExprBinary, ExprGrouping, ExprLiteral, ExprUnary, LiteralValue, Stmt, StmtExpression,
+    },
     lex::{Token, TokenType},
 };
 
@@ -68,9 +70,17 @@ impl<'a> TokenStream<'a> {
             self.advance()?;
             return Ok(());
         }
-        Err(ParserError::UnmatchedParanthesis {
-            token: self.previous()?,
-        })
+        match kind {
+            TokenType::RightParen => Err(ParserError::UnmatchedParanthesis {
+                token: self.previous()?,
+            }),
+            TokenType::Semicolon => Err(ParserError::ExpectedSemicolon {
+                token: self.previous()?,
+            }),
+            _ => Err(ParserError::UnexpectedToken {
+                token: self.previous()?,
+            }),
+        }
     }
 }
 
@@ -83,8 +93,34 @@ impl<'a> Parser<'a> {
         Self { tokenstream }
     }
 
-    pub fn parse(&mut self) -> Result<Expr<'a>, ParserError<'a>> {
-        self.expression()
+    pub fn parse(&mut self) -> Result<Vec<Stmt<'a>>, ParserError<'a>> {
+        let mut statements = vec![];
+        while !self.tokenstream.is_at_end() {
+            statements.push(self.statement()?);
+        }
+        Ok(statements)
+    }
+
+    fn statement(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
+        let operators = [TokenType::Print];
+
+        if self.tokenstream.match_l(&operators)? {
+            return self.print_statement();
+        }
+
+        self.expression_statement()
+    }
+
+    fn print_statement(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
+        let value = self.expression()?;
+        self.tokenstream.consume(&TokenType::Semicolon)?;
+        Ok(Stmt::Expression(StmtExpression::new(value)))
+    }
+
+    fn expression_statement(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
+        let value = self.expression()?;
+        self.tokenstream.consume(&TokenType::Semicolon)?;
+        Ok(Stmt::Expression(StmtExpression::new(value)))
     }
 
     fn expression(&mut self) -> Result<Expr<'a>, ParserError<'a>> {
@@ -235,18 +271,18 @@ mod test {
         let input = "2 + 3";
         let mut parser = setup(input);
 
-        if let Ok(expr) = parser.parse() {
+        if let Ok(stmts) = parser.parse() {
             let left = Expr::Literal(ExprLiteral::new(LiteralValue::F64(2.0)));
 
             let span = Span { begin: 2, end: 3 };
             let operator = Token::new(TokenType::Plus, "+", 1, span);
 
             let right = Expr::Literal(ExprLiteral::new(LiteralValue::F64(3.0)));
+            let stmt = vec![Stmt::Expression(StmtExpression::new(Expr::Binary(
+                ExprBinary::new(Box::new(left), operator, Box::new(right)),
+            )))];
 
-            assert_eq!(
-                Expr::Binary(ExprBinary::new(Box::new(left), operator, Box::new(right))),
-                expr
-            );
+            assert_eq!(stmt, stmts);
         }
     }
 
