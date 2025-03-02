@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match parser.parse() {
         Ok(stmts) => {
-            let mut interpreter = Interpreter;
+            let mut interpreter = Interpreter::new();
             match interpreter.interpret(stmts) {
                 Ok(_) => Ok(()),
                 Err(e) => Err(e.to_string().into()),

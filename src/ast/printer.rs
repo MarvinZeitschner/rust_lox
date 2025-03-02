@@ -12,10 +12,6 @@ impl AstPrinter {
 impl ExprVisitor<'_> for AstPrinter {
     type Output = String;
 
-    fn visit_grouping(&mut self, node: &ExprGrouping) -> Self::Output {
-        self.parenthesize("group", &[&node.value])
-    }
-
     fn visit_literal(&mut self, node: &ExprLiteral) -> Self::Output {
         match &node.value {
             LiteralValue::String(value) => value.clone(),
@@ -25,11 +21,19 @@ impl ExprVisitor<'_> for AstPrinter {
         }
     }
 
+    fn visit_grouping(&mut self, node: &ExprGrouping) -> Self::Output {
+        self.parenthesize("group", &[&node.value])
+    }
+
     fn visit_unary(&mut self, node: &ExprUnary) -> Self::Output {
         self.parenthesize(node.operator.lexeme, &[&node.value])
     }
 
     fn visit_binary(&mut self, node: &ExprBinary) -> Self::Output {
         self.parenthesize(node.operator.lexeme, &[&node.left, &node.right])
+    }
+
+    fn visit_variable(&mut self, _node: &ExprVariable) -> Self::Output {
+        todo!()
     }
 }

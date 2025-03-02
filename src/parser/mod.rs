@@ -4,8 +4,8 @@ use error::{ParserError, TokenStreamError};
 
 use crate::{
     ast::{
-        Expr, ExprBinary, ExprGrouping, ExprLiteral, ExprUnary, LiteralValue, Stmt, StmtExpression,
-        StmtPrint,
+        Expr, ExprBinary, ExprGrouping, ExprLiteral, ExprUnary, ExprVariable, LiteralValue, Stmt,
+        StmtExpression, StmtPrint, StmtVar,
     },
     lex::{Token, TokenType},
 };
@@ -66,10 +66,10 @@ impl<'a> TokenStream<'a> {
         Ok(false)
     }
 
-    fn consume(&mut self, kind: &TokenType) -> Result<(), ParserError<'a>> {
+    fn consume(&mut self, kind: &TokenType) -> Result<Token<'a>, ParserError<'a>> {
         if self.check(kind)? {
-            self.advance()?;
-            return Ok(());
+            let token = self.advance()?;
+            return Ok(token);
         }
         match kind {
             TokenType::RightParen => Err(ParserError::UnmatchedParanthesis {
@@ -97,9 +97,32 @@ impl<'a> Parser<'a> {
     pub fn parse(&mut self) -> Result<Vec<Stmt<'a>>, ParserError<'a>> {
         let mut statements = vec![];
         while !self.tokenstream.is_at_end() {
-            statements.push(self.statement()?);
+            statements.push(self.declaration()?);
         }
         Ok(statements)
+    }
+
+    fn declaration(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
+        let operators = [TokenType::Var];
+
+        let matches = self.tokenstream.match_l(&operators);
+        match matches {
+            Ok(true) => return self.var_declaration(),
+            Err(_) => self.synchronize()?,
+            _ => (),
+        }
+
+        self.statement()
+    }
+
+    fn var_declaration(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
+        let name = self.tokenstream.consume(&TokenType::Ident)?;
+        let mut initializer = None;
+        if self.tokenstream.match_l(&[TokenType::Equal])? {
+            initializer = Some(self.expression()?);
+        }
+        self.tokenstream.consume(&TokenType::Semicolon)?;
+        Ok(Stmt::Var(StmtVar::new(name, initializer)))
     }
 
     fn statement(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
@@ -216,11 +239,12 @@ impl<'a> Parser<'a> {
                 self.tokenstream.consume(&TokenType::RightParen)?;
                 return Ok(Expr::Grouping(ExprGrouping::new(Box::new(expr))));
             }
+            TokenType::Ident => Ok(Expr::Variable(ExprVariable::new(token))),
             _ => Err(ParserError::UnexpectedToken { token }),
         }
     }
 
-    fn synchronize(&mut self) -> Result<(), ParserError> {
+    fn synchronize(&mut self) -> Result<(), ParserError<'a>> {
         self.tokenstream.advance()?;
 
         while !self.tokenstream.is_at_end() {

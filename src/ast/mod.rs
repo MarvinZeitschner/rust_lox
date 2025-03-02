@@ -30,11 +30,22 @@ pub enum Expression<'a> {
         operator: Token<'a>,
         right: Box<Expr<'a>>,
     },
+    Variable {
+        name: Token<'a>,
+    },
 }
 
 #[derive(Ast, Debug, PartialEq)]
 #[name = "Stmt"]
 pub enum Statement<'a> {
-    Expression { expr: Expr<'a> },
-    Print { expr: Expr<'a> },
+    Expression {
+        expr: Expr<'a>,
+    },
+    Print {
+        expr: Expr<'a>,
+    },
+    Var {
+        name: Token<'a>,
+        initializer: Option<Expr<'a>>,
+    },
 }

@@ -1,3 +1,4 @@
+pub mod environment;
 pub mod error;
 
 use std::{
@@ -5,6 +6,7 @@ use std::{
     ops::{Add, Div, Mul, Neg, Not, Sub},
 };
 
+use environment::Environment;
 use error::RuntimeError;
 
 use crate::{
@@ -12,7 +14,7 @@ use crate::{
     lex::{Token, TokenType},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Value {
     Number(f64),
     String(String),
@@ -135,10 +137,17 @@ impl Display for Value {
     }
 }
 
-#[derive(Default)]
-pub struct Interpreter;
+pub struct Interpreter<'a> {
+    environment: Environment<'a>,
+}
 
-impl<'a> Interpreter {
+impl<'a> Interpreter<'a> {
+    pub fn new() -> Self {
+        Self {
+            environment: Environment::new(),
+        }
+    }
+
     pub fn interpret(&mut self, stmts: Vec<Stmt<'a>>) -> Result<(), RuntimeError<'a>> {
         for stmt in stmts {
             self.execute(stmt)?;
@@ -155,7 +164,7 @@ impl<'a> Interpreter {
     }
 
     fn check_number_operand(
-        &self,
+        &mut self,
         value: &Value,
         operator: Token<'a>,
     ) -> Result<(), RuntimeError<'a>> {
@@ -166,7 +175,7 @@ impl<'a> Interpreter {
     }
 
     fn check_number_operands(
-        &self,
+        &mut self,
         left: &Value,
         right: &Value,
         operator: Token<'a>,
@@ -178,7 +187,7 @@ impl<'a> Interpreter {
     }
 }
 
-impl<'a> ExprVisitor<'a> for Interpreter {
+impl<'a> ExprVisitor<'a> for Interpreter<'a> {
     type Output = Result<Value, RuntimeError<'a>>;
 
     fn visit_literal(&mut self, node: &ExprLiteral) -> Self::Output {
@@ -254,9 +263,13 @@ impl<'a> ExprVisitor<'a> for Interpreter {
             _ => Ok(Value::Nil),
         }
     }
+
+    fn visit_variable(&mut self, node: &ExprVariable<'a>) -> Self::Output {
+        self.environment.get(node.name)
+    }
 }
 
-impl<'a> StmtVisitor<'a> for Interpreter {
+impl<'a> StmtVisitor<'a> for Interpreter<'a> {
     type Output = Result<(), RuntimeError<'a>>;
 
     fn visit_expression(&mut self, node: &StmtExpression<'a>) -> Self::Output {
@@ -269,6 +282,15 @@ impl<'a> StmtVisitor<'a> for Interpreter {
         println!("{:#?}", value);
         Ok(())
     }
+
+    fn visit_var(&mut self, node: &StmtVar<'a>) -> Self::Output {
+        let mut value = None;
+        if let Some(initializer) = &node.initializer {
+            value = Some(self.evaluate(initializer)?);
+        }
+        self.environment.define(node.name.lexeme, value);
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -279,7 +301,7 @@ mod test {
 
     #[test]
     fn literal() {
-        let mut interpreter = Interpreter;
+        let mut interpreter = Interpreter::new();
 
         let expr = Expr::Literal(ExprLiteral::new(LiteralValue::F64(1.0)));
         let result = interpreter.evaluate(&expr).unwrap();
@@ -289,7 +311,7 @@ mod test {
 
     #[test]
     fn grouping() {
-        let mut interpreter = Interpreter;
+        let mut interpreter = Interpreter::new();
 
         let expr = Expr::Grouping(ExprGrouping::new(Box::new(Expr::Literal(
             ExprLiteral::new(LiteralValue::F64(1.0)),
@@ -301,7 +323,7 @@ mod test {
 
     #[test]
     fn unary() {
-        let mut interpreter = Interpreter;
+        let mut interpreter = Interpreter::new();
 
         let span = Span { begin: 0, end: 1 };
         let token = Token::new(TokenType::Minus, "-", 1, span);
@@ -316,7 +338,7 @@ mod test {
 
     #[test]
     fn error() {
-        let mut interpreter = Interpreter;
+        let mut interpreter = Interpreter::new();
 
         let span = Span { begin: 0, end: 1 };
         let token = Token::new(TokenType::Minus, "-", 1, span);
