@@ -19,6 +19,9 @@ pub enum ParserError<'a> {
     #[error("[line {}] Error: Unexpected end of file", token.line)]
     UnexpectedEOF { token: Token<'a> },
 
+    #[error("[line {}] Error: Invalid assignment target", token.line)]
+    InvalidAssignmentTarget { token: Token<'a> },
+
     #[error("{0}")]
     TokenStream(#[from] TokenStreamError),
 }

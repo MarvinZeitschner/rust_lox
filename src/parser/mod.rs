@@ -4,8 +4,8 @@ use error::{ParserError, TokenStreamError};
 
 use crate::{
     ast::{
-        Expr, ExprBinary, ExprGrouping, ExprLiteral, ExprUnary, ExprVariable, LiteralValue, Stmt,
-        StmtExpression, StmtPrint, StmtVar,
+        Expr, ExprAssign, ExprBinary, ExprGrouping, ExprLiteral, ExprUnary, ExprVariable,
+        LiteralValue, Stmt, StmtExpression, StmtPrint, StmtVar,
     },
     lex::{Token, TokenType},
 };
@@ -148,7 +148,27 @@ impl<'a> Parser<'a> {
     }
 
     fn expression(&mut self) -> Result<Expr<'a>, ParserError<'a>> {
-        self.equality()
+        self.assignment()
+    }
+
+    fn assignment(&mut self) -> Result<Expr<'a>, ParserError<'a>> {
+        let expr = self.equality()?;
+
+        let operators = [TokenType::Equal];
+
+        if self.tokenstream.match_l(&operators)? {
+            let equals = self.tokenstream.previous()?;
+            let value = self.assignment()?;
+
+            if let Expr::Variable(var) = value {
+                let name = var.name;
+                return Ok(Expr::Assign(ExprAssign::new(name, var)));
+            }
+
+            return Err(ParserError::InvalidAssignmentTarget { token: equals });
+        }
+
+        Ok(expr)
     }
 
     fn equality(&mut self) -> Result<Expr<'a>, ParserError<'a>> {
