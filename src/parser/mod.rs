@@ -160,9 +160,9 @@ impl<'a> Parser<'a> {
             let equals = self.tokenstream.previous()?;
             let value = self.assignment()?;
 
-            if let Expr::Variable(var) = value {
+            if let Expr::Variable(var) = &expr {
                 let name = var.name;
-                return Ok(Expr::Assign(ExprAssign::new(name, var)));
+                return Ok(Expr::Assign(ExprAssign::new(name, Box::new(value))));
             }
 
             return Err(ParserError::InvalidAssignmentTarget { token: equals });

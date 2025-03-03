@@ -9,7 +9,7 @@ pub struct Environment<'a> {
     values: HashMap<&'a str, Option<Value>>,
 }
 
-impl<'a, 'b> Environment<'a> {
+impl<'a> Environment<'a> {
     pub fn new() -> Self {
         Self {
             values: HashMap::new(),
@@ -24,13 +24,25 @@ impl<'a, 'b> Environment<'a> {
         }
     }
 
-    pub fn get(&mut self, name: Token<'b>) -> Result<Value, RuntimeError<'b>> {
+    pub fn get(&mut self, name: Token<'a>) -> Result<Value, RuntimeError<'a>> {
         match self.values.get(name.lexeme) {
             Some(value) => match value {
                 Some(value) => Ok(value.clone()),
                 None => Ok(Value::Nil),
             },
             None => Err(RuntimeError::UndefinedVariable { name }),
+        }
+    }
+
+    pub fn assign(&mut self, name: Token<'a>, value: Value) -> Result<(), RuntimeError<'a>> {
+        match self.values.contains_key(name.lexeme) {
+            true => {
+                self.values
+                    .entry(name.lexeme)
+                    .and_modify(|v| *v = Some(value));
+                Ok(())
+            }
+            false => Err(RuntimeError::UndefinedVariable { name }),
         }
     }
 }

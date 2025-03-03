@@ -32,8 +32,7 @@ pub enum Expression<'a> {
     },
     Assign {
         name: Token<'a>,
-        // TODO: Check if this shouldnt be a normal Expr
-        value: ExprVariable<'a>,
+        value: Box<Expr<'a>>,
     },
     Variable {
         name: Token<'a>,

@@ -264,6 +264,12 @@ impl<'a> ExprVisitor<'a> for Interpreter<'a> {
         }
     }
 
+    fn visit_assign(&mut self, node: &ExprAssign<'a>) -> Self::Output {
+        let value = self.evaluate(&node.value)?;
+        self.environment.assign(node.name, value.clone())?;
+        return Ok(value);
+    }
+
     fn visit_variable(&mut self, node: &ExprVariable<'a>) -> Self::Output {
         self.environment.get(node.name)
     }

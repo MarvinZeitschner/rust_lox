@@ -33,6 +33,10 @@ impl ExprVisitor<'_> for AstPrinter {
         self.parenthesize(node.operator.lexeme, &[&node.left, &node.right])
     }
 
+    fn visit_assign(&mut self, _node: &ExprAssign) -> Self::Output {
+        todo!()
+    }
+
     fn visit_variable(&mut self, _node: &ExprVariable) -> Self::Output {
         todo!()
     }
