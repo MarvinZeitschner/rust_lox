@@ -13,6 +13,6 @@ pub enum RuntimeError<'a> {
     #[error("[line {}] Operands must be two numbers or two strings", operator.line)]
     NumberOrStringOperands { operator: Token<'a> },
 
-    #[error("Undefined Variable '{}'", name.line)]
+    #[error("Undefined Variable '{}'", name.lexeme)]
     UndefinedVariable { name: Token<'a> },
 }

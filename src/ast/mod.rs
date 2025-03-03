@@ -30,6 +30,10 @@ pub enum Expression<'a> {
         operator: Token<'a>,
         right: Box<Expr<'a>>,
     },
+    Assign {
+        name: Token<'a>,
+        value: Box<Expr<'a>>,
+    },
     Variable {
         name: Token<'a>,
     },
