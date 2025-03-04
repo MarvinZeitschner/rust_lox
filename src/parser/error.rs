@@ -22,6 +22,9 @@ pub enum ParserError<'a> {
     #[error("[line {}] Error: Invalid assignment target", token.line)]
     InvalidAssignmentTarget { token: Token<'a> },
 
+    #[error("[line {}] Error: Expected {{ after block", token.line)]
+    ExpectedRightBrace { token: Token<'a> },
+
     #[error("{0}")]
     TokenStream(#[from] TokenStreamError),
 }

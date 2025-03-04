@@ -5,7 +5,7 @@ use error::{ParserError, TokenStreamError};
 use crate::{
     ast::{
         Expr, ExprAssign, ExprBinary, ExprGrouping, ExprLiteral, ExprUnary, ExprVariable,
-        LiteralValue, Stmt, StmtExpression, StmtPrint, StmtVar,
+        LiteralValue, Stmt, StmtBlock, StmtExpression, StmtPrint, StmtVar,
     },
     lex::{Token, TokenType},
 };
@@ -78,6 +78,9 @@ impl<'a> TokenStream<'a> {
             TokenType::Semicolon => Err(ParserError::ExpectedSemicolon {
                 token: self.previous()?,
             }),
+            TokenType::RightBrace => Err(ParserError::ExpectedRightBrace {
+                token: self.previous()?,
+            }),
             _ => Err(ParserError::UnexpectedToken {
                 token: self.previous()?,
             }),
@@ -126,13 +129,26 @@ impl<'a> Parser<'a> {
     }
 
     fn statement(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
-        let operators = [TokenType::Print];
-
-        if self.tokenstream.match_l(&operators)? {
+        if self.tokenstream.match_l(&[TokenType::Print])? {
             return self.print_statement();
+        }
+        if self.tokenstream.match_l(&[TokenType::RightBrace])? {
+            return Ok(Stmt::Block(StmtBlock::new(self.block()?)));
         }
 
         self.expression_statement()
+    }
+
+    fn block(&mut self) -> Result<Vec<Stmt<'a>>, ParserError<'a>> {
+        let mut statements = vec![];
+
+        while !self.tokenstream.check(&TokenType::RightBrace)? && !self.tokenstream.is_at_end() {
+            statements.push(self.declaration()?);
+        }
+
+        self.tokenstream.consume(&TokenType::RightBrace);
+
+        Ok(statements)
     }
 
     fn print_statement(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
