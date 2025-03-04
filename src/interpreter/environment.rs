@@ -55,6 +55,7 @@ impl<'a> Environment<'a> {
     }
 }
 
+#[derive(Default)]
 pub struct EnvironmentBuilder<'a> {
     encolsing: Option<Box<Environment<'a>>>,
 }
@@ -64,20 +65,15 @@ impl<'a> EnvironmentBuilder<'a> {
         Self { encolsing: None }
     }
 
-    pub fn enclosing(mut self, enclosing: Environment<'a>) {
-        self.encolsing = Some(Box::new(enclosing));
+    pub fn enclosing(mut self, enclosing: Environment<'a>) -> EnvironmentBuilder<'a> {
+        self.encolsing = Some(Box::new(enclosing.clone()));
+        self
     }
 
-    pub fn build(&self) -> Environment {
+    pub fn build(self) -> Environment<'a> {
         Environment {
             values: HashMap::new(),
             enclosing: self.encolsing.clone(),
         }
-    }
-}
-
-impl<'a> Default for EnvironmentBuilder<'a> {
-    fn default() -> Self {
-        Self::new()
     }
 }

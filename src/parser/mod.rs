@@ -132,7 +132,7 @@ impl<'a> Parser<'a> {
         if self.tokenstream.match_l(&[TokenType::Print])? {
             return self.print_statement();
         }
-        if self.tokenstream.match_l(&[TokenType::RightBrace])? {
+        if self.tokenstream.match_l(&[TokenType::LeftBrace])? {
             return Ok(Stmt::Block(StmtBlock::new(self.block()?)));
         }
 
@@ -146,7 +146,7 @@ impl<'a> Parser<'a> {
             statements.push(self.declaration()?);
         }
 
-        self.tokenstream.consume(&TokenType::RightBrace);
+        self.tokenstream.consume(&TokenType::RightBrace)?;
 
         Ok(statements)
     }

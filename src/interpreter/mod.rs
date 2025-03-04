@@ -6,7 +6,7 @@ use std::{
     ops::{Add, Div, Mul, Neg, Not, Sub},
 };
 
-use environment::Environment;
+use environment::{Environment, EnvironmentBuilder};
 use error::RuntimeError;
 
 use crate::{
@@ -137,6 +137,7 @@ impl Display for Value {
     }
 }
 
+#[derive(Default)]
 pub struct Interpreter<'a> {
     environment: Environment<'a>,
 }
@@ -157,6 +158,30 @@ impl<'a> Interpreter<'a> {
 
     fn execute(&mut self, stmt: Stmt<'a>) -> Result<(), RuntimeError<'a>> {
         stmt.accept(self)
+    }
+
+    fn execute_block(
+        &mut self,
+        statements: Vec<Stmt<'a>>,
+        environment: Environment<'a>,
+    ) -> Result<(), RuntimeError<'a>> {
+        let previous_env = self.environment.clone();
+
+        self.environment = environment;
+
+        for stmt in statements {
+            match self.execute(stmt) {
+                Ok(_) => {}
+                Err(e) => {
+                    self.environment = previous_env;
+                    return Err(e);
+                }
+            }
+        }
+
+        self.environment = previous_env;
+
+        Ok(())
     }
 
     fn evaluate(&mut self, expr: &Expr<'a>) -> Result<Value, RuntimeError<'a>> {
@@ -267,7 +292,7 @@ impl<'a> ExprVisitor<'a> for Interpreter<'a> {
     fn visit_assign(&mut self, node: &ExprAssign<'a>) -> Self::Output {
         let value = self.evaluate(&node.value)?;
         self.environment.assign(node.name, value.clone())?;
-        return Ok(value);
+        Ok(value)
     }
 
     fn visit_variable(&mut self, node: &ExprVariable<'a>) -> Self::Output {
@@ -277,6 +302,18 @@ impl<'a> ExprVisitor<'a> for Interpreter<'a> {
 
 impl<'a> StmtVisitor<'a> for Interpreter<'a> {
     type Output = Result<(), RuntimeError<'a>>;
+
+    fn visit_block(&mut self, node: &StmtBlock<'a>) -> Self::Output {
+        // TODO: Remove these clones!
+        // TODO: Check if the visitors can take ownership of the statements and expressions
+        self.execute_block(
+            node.statements.clone(),
+            EnvironmentBuilder::new()
+                .enclosing(self.environment.clone())
+                .build(),
+        )?;
+        Ok(())
+    }
 
     fn visit_expression(&mut self, node: &StmtExpression<'a>) -> Self::Output {
         self.evaluate(&node.expr)?;
