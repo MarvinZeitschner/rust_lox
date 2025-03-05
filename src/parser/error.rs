@@ -7,6 +7,9 @@ pub enum ParserError<'a> {
     #[error("[line {}] Error: Expected ')' after expression", token.line)]
     UnmatchedParanthesis { token: Token<'a> },
 
+    #[error("[line {}] Error: Expected '(' after if", token.line)]
+    ExpectedLeftparen { token: Token<'a> },
+
     #[error("[line {}] Error: Expected expression", token.line)]
     ExpectedExpression { token: Token<'a> },
 
