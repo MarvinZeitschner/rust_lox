@@ -24,14 +24,14 @@ struct Evaluator;
 impl ExprVisitor for Evaluator {
     type Output = f64;
 
-    fn visit_literal(&mut self, node: &ExprLiteral) -> Self::Output {
+    fn visit_literal(&mut self, node: ExprLiteral) -> Self::Output {
         if let LiteralValue::F64(val) = node.value {
             return val;
         }
         0.0
     }
 
-    fn visit_binary(&mut self, node: &ExprBinary) -> Self::Output {
+    fn visit_binary(&mut self, node: ExprBinary) -> Self::Output {
         let left_val = node.left.accept(self);
         let right_val = node.right.accept(self);
 
@@ -49,7 +49,11 @@ struct AstPrinter;
 
 impl AstPrinter {
     fn parenthesize(&mut self, name: String, node: &[&Expr]) -> String {
-        let expr_ac: Vec<String> = node.iter().map(|node| node.accept(self)).collect();
+        let mut expr_ac = Vec::new();
+        for expr in node {
+            let e = (*expr).clone();
+            expr_ac.push(e.accept(self));
+        }
         format!("({} {})", name, expr_ac.join(" "))
     }
 }
@@ -57,14 +61,14 @@ impl AstPrinter {
 impl ExprVisitor for AstPrinter {
     type Output = String;
 
-    fn visit_literal(&mut self, node: &ExprLiteral) -> Self::Output {
+    fn visit_literal(&mut self, node: ExprLiteral) -> Self::Output {
         match &node.value {
             LiteralValue::String(value) => value.clone(),
             LiteralValue::F64(value) => value.to_string(),
         }
     }
 
-    fn visit_binary(&mut self, node: &ExprBinary) -> Self::Output {
+    fn visit_binary(&mut self, node: ExprBinary) -> Self::Output {
         self.parenthesize(node.operator.clone(), &[&node.left, &node.right])
     }
 }

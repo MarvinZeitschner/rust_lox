@@ -184,7 +184,7 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    fn evaluate(&mut self, expr: &Expr<'a>) -> Result<Value, RuntimeError<'a>> {
+    fn evaluate(&mut self, expr: Expr<'a>) -> Result<Value, RuntimeError<'a>> {
         expr.accept(self)
     }
 
@@ -215,17 +215,17 @@ impl<'a> Interpreter<'a> {
 impl<'a> ExprVisitor<'a> for Interpreter<'a> {
     type Output = Result<Value, RuntimeError<'a>>;
 
-    fn visit_literal(&mut self, node: &ExprLiteral) -> Self::Output {
-        Ok(node.value.clone().into())
+    fn visit_literal(&mut self, node: ExprLiteral) -> Self::Output {
+        Ok(node.value.into())
     }
 
-    fn visit_grouping(&mut self, node: &ExprGrouping<'a>) -> Self::Output {
-        self.evaluate(&node.value)
+    fn visit_grouping(&mut self, node: ExprGrouping<'a>) -> Self::Output {
+        self.evaluate(*node.value)
     }
 
-    fn visit_unary(&mut self, node: &ExprUnary<'a>) -> Self::Output {
+    fn visit_unary(&mut self, node: ExprUnary<'a>) -> Self::Output {
         let operator = node.operator;
-        let right = self.evaluate(&node.value)?;
+        let right = self.evaluate(*node.value)?;
 
         match node.operator.kind {
             TokenType::Minus => {
@@ -240,10 +240,10 @@ impl<'a> ExprVisitor<'a> for Interpreter<'a> {
         }
     }
 
-    fn visit_binary(&mut self, node: &ExprBinary<'a>) -> Self::Output {
+    fn visit_binary(&mut self, node: ExprBinary<'a>) -> Self::Output {
         let operator = node.operator;
-        let left = self.evaluate(&node.left)?;
-        let right = self.evaluate(&node.right)?;
+        let left = self.evaluate(*node.left)?;
+        let right = self.evaluate(*node.right)?;
 
         match node.operator.kind {
             TokenType::Minus => {
@@ -289,13 +289,13 @@ impl<'a> ExprVisitor<'a> for Interpreter<'a> {
         }
     }
 
-    fn visit_assign(&mut self, node: &ExprAssign<'a>) -> Self::Output {
-        let value = self.evaluate(&node.value)?;
+    fn visit_assign(&mut self, node: ExprAssign<'a>) -> Self::Output {
+        let value = self.evaluate(*node.value)?;
         self.environment.assign(node.name, value.clone())?;
         Ok(value)
     }
 
-    fn visit_variable(&mut self, node: &ExprVariable<'a>) -> Self::Output {
+    fn visit_variable(&mut self, node: ExprVariable<'a>) -> Self::Output {
         self.environment.get(node.name)
     }
 }
@@ -303,11 +303,9 @@ impl<'a> ExprVisitor<'a> for Interpreter<'a> {
 impl<'a> StmtVisitor<'a> for Interpreter<'a> {
     type Output = Result<(), RuntimeError<'a>>;
 
-    fn visit_block(&mut self, node: &StmtBlock<'a>) -> Self::Output {
-        // TODO: Remove these clones!
-        // TODO: Check if the visitors can take ownership of the statements and expressions
+    fn visit_block(&mut self, node: StmtBlock<'a>) -> Self::Output {
         self.execute_block(
-            node.statements.clone(),
+            node.statements,
             EnvironmentBuilder::new()
                 .enclosing(self.environment.clone())
                 .build(),
@@ -315,37 +313,35 @@ impl<'a> StmtVisitor<'a> for Interpreter<'a> {
         Ok(())
     }
 
-    fn visit_expression(&mut self, node: &StmtExpression<'a>) -> Self::Output {
-        self.evaluate(&node.expr)?;
+    fn visit_expression(&mut self, node: StmtExpression<'a>) -> Self::Output {
+        self.evaluate(node.expr)?;
         Ok(())
     }
 
-    fn visit_if(&mut self, node: &StmtIf<'a>) -> Self::Output {
-        let condition = self.evaluate(&node.condition)?;
+    fn visit_if(&mut self, node: StmtIf<'a>) -> Self::Output {
+        let condition = self.evaluate(node.condition)?;
         let Value::Boolean(condition) = condition else {
             // TODO: Check
             return Ok(());
         };
         if condition {
-            // TODO: clones
-            self.execute(*node.then_branch.clone())?;
+            self.execute(*node.then_branch)?;
         } else if node.else_branch.is_some() {
-            // TODO: clones
-            self.execute(*node.else_branch.clone().unwrap())?;
+            self.execute(*node.else_branch.unwrap())?;
         }
 
         Ok(())
     }
 
-    fn visit_print(&mut self, node: &StmtPrint<'a>) -> Self::Output {
-        let value = self.evaluate(&node.expr)?;
+    fn visit_print(&mut self, node: StmtPrint<'a>) -> Self::Output {
+        let value = self.evaluate(node.expr)?;
         println!("{:#?}", value);
         Ok(())
     }
 
-    fn visit_var(&mut self, node: &StmtVar<'a>) -> Self::Output {
+    fn visit_var(&mut self, node: StmtVar<'a>) -> Self::Output {
         let mut value = None;
-        if let Some(initializer) = &node.initializer {
+        if let Some(initializer) = node.initializer {
             value = Some(self.evaluate(initializer)?);
         }
         self.environment.define(node.name.lexeme, value);
@@ -364,7 +360,7 @@ mod test {
         let mut interpreter = Interpreter::new();
 
         let expr = Expr::Literal(ExprLiteral::new(LiteralValue::F64(1.0)));
-        let result = interpreter.evaluate(&expr).unwrap();
+        let result = interpreter.evaluate(expr).unwrap();
 
         assert_eq!(result, Value::Number(1.0));
     }
@@ -376,7 +372,7 @@ mod test {
         let expr = Expr::Grouping(ExprGrouping::new(Box::new(Expr::Literal(
             ExprLiteral::new(LiteralValue::F64(1.0)),
         ))));
-        let result = interpreter.evaluate(&expr).unwrap();
+        let result = interpreter.evaluate(expr).unwrap();
 
         assert_eq!(result, Value::Number(1.0));
     }
@@ -391,7 +387,7 @@ mod test {
             token,
             Box::new(Expr::Literal(ExprLiteral::new(LiteralValue::F64(1.0)))),
         ));
-        let result = interpreter.evaluate(&expr).unwrap();
+        let result = interpreter.evaluate(expr).unwrap();
 
         assert_eq!(result, Value::Number(-1.0));
     }
@@ -408,7 +404,7 @@ mod test {
                 "1".to_string(),
             )))),
         ));
-        let result = interpreter.evaluate(&expr);
+        let result = interpreter.evaluate(expr);
 
         assert_eq!(result, Err(RuntimeError::NumberOperand { operator: token }));
     }

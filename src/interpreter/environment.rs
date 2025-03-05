@@ -66,14 +66,14 @@ impl<'a> EnvironmentBuilder<'a> {
     }
 
     pub fn enclosing(mut self, enclosing: Environment<'a>) -> EnvironmentBuilder<'a> {
-        self.encolsing = Some(Box::new(enclosing.clone()));
+        self.encolsing = Some(Box::new(enclosing));
         self
     }
 
     pub fn build(self) -> Environment<'a> {
         Environment {
             values: HashMap::new(),
-            enclosing: self.encolsing.clone(),
+            enclosing: self.encolsing,
         }
     }
 }

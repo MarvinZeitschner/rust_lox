@@ -80,7 +80,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         }
 
         impl #enum_lifetime_tokenstream #name #enum_lifetime_tokenstream {
-            pub fn accept<V: #visitor_name #enum_lifetime_tokenstream>(&self, visitor: &mut V) -> V::Output {
+            pub fn accept<V: #visitor_name #enum_lifetime_tokenstream>(self, visitor: &mut V) -> V::Output {
                 match self {
                     #(#accept_methods),*
                 }
