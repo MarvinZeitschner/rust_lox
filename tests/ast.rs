@@ -106,7 +106,6 @@ fn evaluator_visitor() {
 
 #[test]
 fn ast_printer() {
-    // Expr: (5 + 3) * 2 = 16
     let five = Box::new(Expr::Literal(ExprLiteral::new(LiteralValue::F64(5.1))));
     let three = Box::new(Expr::Literal(ExprLiteral::new(LiteralValue::F64(3.1))));
     let add = Box::new(Expr::Binary(ExprBinary::new(five, "+".to_string(), three)));
