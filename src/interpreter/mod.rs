@@ -320,6 +320,23 @@ impl<'a> StmtVisitor<'a> for Interpreter<'a> {
         Ok(())
     }
 
+    fn visit_if(&mut self, node: &StmtIf<'a>) -> Self::Output {
+        let condition = self.evaluate(&node.condition)?;
+        let Value::Boolean(condition) = condition else {
+            // TODO: Check
+            return Ok(());
+        };
+        if condition {
+            // TODO: clones
+            self.execute(*node.then_branch.clone())?;
+        } else if node.else_branch.is_some() {
+            // TODO: clones
+            self.execute(*node.else_branch.clone().unwrap())?;
+        }
+
+        Ok(())
+    }
+
     fn visit_print(&mut self, node: &StmtPrint<'a>) -> Self::Output {
         let value = self.evaluate(&node.expr)?;
         println!("{:#?}", value);

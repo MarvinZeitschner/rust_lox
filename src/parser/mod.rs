@@ -5,7 +5,7 @@ use error::{ParserError, TokenStreamError};
 use crate::{
     ast::{
         Expr, ExprAssign, ExprBinary, ExprGrouping, ExprLiteral, ExprUnary, ExprVariable,
-        LiteralValue, Stmt, StmtBlock, StmtExpression, StmtPrint, StmtVar,
+        LiteralValue, Stmt, StmtBlock, StmtExpression, StmtIf, StmtPrint, StmtVar,
     },
     lex::{Token, TokenType},
 };
@@ -75,6 +75,9 @@ impl<'a> TokenStream<'a> {
             TokenType::RightParen => Err(ParserError::UnmatchedParanthesis {
                 token: self.previous()?,
             }),
+            TokenType::LeftParen => Err(ParserError::ExpectedLeftparen {
+                token: self.previous()?,
+            }),
             TokenType::Semicolon => Err(ParserError::ExpectedSemicolon {
                 token: self.previous()?,
             }),
@@ -129,6 +132,9 @@ impl<'a> Parser<'a> {
     }
 
     fn statement(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
+        if self.tokenstream.match_l(&[TokenType::If])? {
+            return self.if_statement();
+        }
         if self.tokenstream.match_l(&[TokenType::Print])? {
             return self.print_statement();
         }
@@ -137,6 +143,22 @@ impl<'a> Parser<'a> {
         }
 
         self.expression_statement()
+    }
+
+    fn if_statement(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
+        self.tokenstream.consume(&TokenType::LeftParen)?;
+        let condition = self.expression()?;
+        // TODO: This shouldnt result in an UnmatchedParanthesis error, but rather an
+        // "ExpectedLeftParen after if condition"
+        self.tokenstream.consume(&TokenType::RightParen)?;
+
+        let then_branch = Box::new(self.statement()?);
+        let mut else_branch = None;
+        if self.tokenstream.match_l(&[TokenType::Else])? {
+            else_branch = Some(Box::new(self.statement()?));
+        }
+
+        Ok(Stmt::If(StmtIf::new(condition, then_branch, else_branch)))
     }
 
     fn block(&mut self) -> Result<Vec<Stmt<'a>>, ParserError<'a>> {

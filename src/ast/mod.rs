@@ -48,6 +48,11 @@ pub enum Statement<'a> {
     Expression {
         expr: Expr<'a>,
     },
+    If {
+        condition: Expr<'a>,
+        then_branch: Box<Stmt<'a>>,
+        else_branch: Option<Box<Stmt<'a>>>,
+    },
     Print {
         expr: Expr<'a>,
     },
