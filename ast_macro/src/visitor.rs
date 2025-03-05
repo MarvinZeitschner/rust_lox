@@ -12,7 +12,7 @@ pub fn visitor_method(variant: &Variant, lifetime: Option<&Lifetime>, name: Iden
     };
 
     quote! {
-        fn #visitor_name(&mut self, node: &#struct_name #lt) -> Self::Output;
+        fn #visitor_name(&mut self, node: #struct_name #lt) -> Self::Output;
     }
 }
 

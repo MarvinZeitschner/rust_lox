@@ -4,7 +4,11 @@ pub struct AstPrinter;
 
 impl AstPrinter {
     fn parenthesize(&mut self, name: &str, node: &[&Expr]) -> String {
-        let expr_ac: Vec<String> = node.iter().map(|node| node.accept(self)).collect();
+        let mut expr_ac = Vec::new();
+        for expr in node {
+            let e = (*expr).clone();
+            expr_ac.push(e.accept(self));
+        }
         format!("({} {})", name, expr_ac.join(" "))
     }
 }
@@ -12,7 +16,7 @@ impl AstPrinter {
 impl ExprVisitor<'_> for AstPrinter {
     type Output = String;
 
-    fn visit_literal(&mut self, node: &ExprLiteral) -> Self::Output {
+    fn visit_literal(&mut self, node: ExprLiteral) -> Self::Output {
         match &node.value {
             LiteralValue::String(value) => value.clone(),
             LiteralValue::F64(value) => value.to_string(),
@@ -21,23 +25,23 @@ impl ExprVisitor<'_> for AstPrinter {
         }
     }
 
-    fn visit_grouping(&mut self, node: &ExprGrouping) -> Self::Output {
+    fn visit_grouping(&mut self, node: ExprGrouping) -> Self::Output {
         self.parenthesize("group", &[&node.value])
     }
 
-    fn visit_unary(&mut self, node: &ExprUnary) -> Self::Output {
+    fn visit_unary(&mut self, node: ExprUnary) -> Self::Output {
         self.parenthesize(node.operator.lexeme, &[&node.value])
     }
 
-    fn visit_binary(&mut self, node: &ExprBinary) -> Self::Output {
+    fn visit_binary(&mut self, node: ExprBinary) -> Self::Output {
         self.parenthesize(node.operator.lexeme, &[&node.left, &node.right])
     }
 
-    fn visit_assign(&mut self, _node: &ExprAssign) -> Self::Output {
+    fn visit_assign(&mut self, _node: ExprAssign) -> Self::Output {
         todo!()
     }
 
-    fn visit_variable(&mut self, _node: &ExprVariable) -> Self::Output {
+    fn visit_variable(&mut self, _node: ExprVariable) -> Self::Output {
         todo!()
     }
 }
