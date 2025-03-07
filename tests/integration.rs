@@ -4,7 +4,7 @@ use test_generator::test_resources;
 
 const INTERPRETER_PATH: &str = "target/debug/rust_lox";
 
-#[test_resources("tests/scripts/*.lox")]
+#[test_resources("tests/scripts/*/*.lox")]
 fn test_script(path: &str) {
     let path = PathBuf::from(path);
     let script_content = fs::read_to_string(&path).expect("Failed to read test script");
@@ -26,11 +26,13 @@ fn test_script(path: &str) {
         .map(|line| line.trim().to_string())
         .collect();
 
+    println!("--------------------------------------------------------------------------------------------");
     println!("Testing file: {}", path.display());
-    println!("Script content:\n{}", script_content);
     println!("Stdout lines: {:?}", stdout_lines);
     println!("Stderr lines: {:?}", stderr_lines);
-    println!("Test expectations: {:?}", test_expectations);
+    println!("Test expectations: {:#?}", test_expectations);
+    println!("--------------------------------------------------------------------------------------------");
+    println!();
 
     if let Some(runtime_error_idx) = test_expectations
         .iter()
