@@ -84,6 +84,9 @@ impl<'a> TokenStream<'a> {
             TokenType::RightBrace => Err(ParserError::ExpectedRightBrace {
                 token: self.previous()?,
             }),
+            TokenType::Ident => Err(ParserError::InvalidAssignmentTarget {
+                token: self.previous()?,
+            }),
             _ => Err(ParserError::UnexpectedToken {
                 token: self.previous()?,
             }),

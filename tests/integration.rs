@@ -1,99 +1,159 @@
-use std::{fs, path::Path};
+use regex::Regex;
+use std::{fs, path::PathBuf, process::Command};
+use test_generator::test_resources;
 
-use rust_lox::{
-    ast::Stmt,
-    interpreter::Interpreter,
-    lex::Scanner,
-    parser::{Parser, TokenStream},
-};
+const INTERPRETER_PATH: &str = "target/debug/rust_lox";
 
-enum Expectation {
-    Output(String),
-    Error(String),
-}
+#[test_resources("tests/scripts/*.lox")]
+fn test_script(path: &str) {
+    let path = PathBuf::from(path);
+    let script_content = fs::read_to_string(&path).expect("Failed to read test script");
 
-struct LineResult {
-    line: usize,
-    expected: Expectation,
-    actual: Result<(), Box<dyn std::error::Error>>,
-}
+    let test_expectations = parse_test_expectations(&script_content);
 
-struct AnnotatedTestRunner<'a> {
-    interpreter: Interpreter<'a>,
-}
+    let output = Command::new(INTERPRETER_PATH)
+        .arg(&path)
+        .output()
+        .expect("Failed to execute interpreter");
 
-impl<'a> AnnotatedTestRunner<'a> {
-    fn new() -> Self {
-        Self {
-            interpreter: Interpreter::new(),
-        }
-    }
+    let stdout_lines: Vec<String> = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(|line| line.trim().to_string())
+        .collect();
 
-    fn setup(&self, input: &'a str) -> Vec<Stmt<'a>> {
-        let mut lexer = Scanner::new(input);
-        // TODO: Integration tests for parsing
-        Parser::new(TokenStream::new(lexer.scan_tokens().unwrap()))
-            .parse()
-            .unwrap()
-    }
+    let stderr_lines: Vec<String> = String::from_utf8_lossy(&output.stderr)
+        .lines()
+        .map(|line| line.trim().to_string())
+        .collect();
 
-    fn parse_expectation(&self, script: &str) -> Vec<(usize, Expectation)> {
-        script
-            .lines()
-            .enumerate()
-            .filter_map(|(line_num, line)| {
-                if let Some(expectation_str) = line.trim().strip_prefix("// expected:") {
-                    let expectation = match expectation_str.trim() {
-                        // TODO: add more types to check against
-                        output if !output.is_empty() => {
-                            Some(Expectation::Output(output.to_string()))
-                        }
-                        _ => None,
-                    };
-                    expectation.map(|exp| (line_num, exp))
-                } else {
-                    None
+    println!("Testing file: {}", path.display());
+    println!("Script content:\n{}", script_content);
+    println!("Stdout lines: {:?}", stdout_lines);
+    println!("Stderr lines: {:?}", stderr_lines);
+    println!("Test expectations: {:?}", test_expectations);
+
+    if let Some(runtime_error_idx) = test_expectations
+        .iter()
+        .position(|expectation| matches!(expectation, TestExpectation::RuntimeError { .. }))
+    {
+        let expected_error = match &test_expectations[runtime_error_idx] {
+            TestExpectation::RuntimeError {
+                line_number,
+                error_message,
+            } => {
+                println!(
+                    "Checking runtime error at line {}: {}",
+                    line_number, error_message
+                );
+                error_message
+            }
+            _ => unreachable!(),
+        };
+
+        let error_found = stderr_lines
+            .iter()
+            .any(|line| line.contains(expected_error));
+        assert!(
+            error_found,
+            "Expected runtime error '{}' not found in stderr",
+            expected_error
+        );
+
+        for (i, expectation) in test_expectations.iter().enumerate() {
+            if i >= runtime_error_idx {
+                break;
+            }
+
+            match expectation {
+                TestExpectation::Output {
+                    line_number,
+                    output_line,
+                } if i < stdout_lines.len() => {
+                    assert_eq!(
+                        &stdout_lines[i], output_line,
+                        "Line {}: Expected '{}' but got '{}'",
+                        line_number, output_line, stdout_lines[i]
+                    );
                 }
-            })
-            .collect()
-    }
+                TestExpectation::Output {
+                    line_number,
+                    output_line,
+                } => {
+                    panic!(
+                        "Line {}: Expected output '{}' but execution terminated early",
+                        line_number, output_line
+                    );
+                }
+                _ => {}
+            }
+        }
+    } else {
+        let mut output_idx = 0;
 
-    fn run(&mut self, script: &'a str) -> Vec<LineResult> {
-        let expecations = self.parse_expectation(script);
+        for expectation in &test_expectations {
+            if let TestExpectation::Output {
+                line_number,
+                output_line,
+            } = expectation
+            {
+                assert!(
+                    output_idx < stdout_lines.len(),
+                    "Line {}: Expected output '{}' but not enough lines in stdout",
+                    line_number,
+                    output_line
+                );
 
-        // expecations
-        //     .into_iter()
-        //     .map(|(line_num, expectation)| {
-        //         let stmts = self.setup(script);
-        //         let result = match self.interpreter.interpret(stmts) {
-        //             Ok(output) => ,
-        //             Err(_) => todo!(),
-        //         };
-        //     })
-        //     .collect()
+                assert_eq!(
+                    &stdout_lines[output_idx], output_line,
+                    "Line {}: Expected '{}' but got '{}'",
+                    line_number, output_line, stdout_lines[output_idx]
+                );
 
-        todo!()
-    }
-}
-
-fn run_lox_test_files(directory: &str) {
-    let path = Path::new(directory);
-
-    for entry in fs::read_dir(path).expect("Failed to read directory") {
-        let entry = entry.expect("Failed to get directory entry");
-        let path = entry.path();
-
-        if path.extension().unwrap_or_default() == "lox" {
-            let script_content = fs::read_to_string(&path).expect("Failed to read Lox script");
-
-            // let result = run(&script_content);
-            // println!("Running test file: {:?}", path);
-            // assert!(result.is_ok(), "Test file {} failed", path.display());
+                output_idx += 1;
+            }
         }
     }
 }
 
-#[test]
-fn test_lox_scripts_in_test_directory() {
-    run_lox_test_files("tests/scripts");
+#[derive(Debug)]
+enum TestExpectation {
+    Output {
+        line_number: usize,
+        output_line: String,
+    },
+    RuntimeError {
+        line_number: usize,
+        error_message: String,
+    },
+}
+
+fn parse_test_expectations(script_content: &str) -> Vec<TestExpectation> {
+    let mut expectations = Vec::new();
+
+    let expected_regex = Regex::new(r"//\s*expect:\s*(.*)").unwrap();
+    let runtime_error_regex = Regex::new(r"//\s*expect runtime error:\s*(.*)").unwrap();
+
+    for (idx, line) in script_content.lines().enumerate() {
+        let line_number = idx + 1;
+
+        if let Some(captures) = expected_regex.captures(line) {
+            if let Some(value_match) = captures.get(1) {
+                expectations.push(TestExpectation::Output {
+                    line_number,
+                    output_line: value_match.as_str().trim().to_string(),
+                });
+            }
+        }
+
+        if let Some(captures) = runtime_error_regex.captures(line) {
+            if let Some(value_match) = captures.get(1) {
+                expectations.push(TestExpectation::RuntimeError {
+                    line_number,
+                    error_message: value_match.as_str().trim().to_string(),
+                });
+            }
+        }
+    }
+
+    expectations
 }

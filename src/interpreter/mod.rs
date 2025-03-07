@@ -335,7 +335,7 @@ impl<'a> StmtVisitor<'a> for Interpreter<'a> {
 
     fn visit_print(&mut self, node: StmtPrint<'a>) -> Self::Output {
         let value = self.evaluate(node.expr)?;
-        println!("{:#?}", value);
+        println!("{}", value);
         Ok(())
     }
 
