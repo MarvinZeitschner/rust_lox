@@ -15,25 +15,38 @@ struct Args {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
-    let file_content = &fs::read_to_string(args.path.clone())
-        .unwrap_or_else(|_| panic!("Failed to read file: {}", args.path));
-    let contents = file_content.trim();
 
-    let mut parser = setup(contents);
+    let binding = fs::read_to_string(&args.path)?;
+    let contents = binding.trim();
 
-    match parser.parse() {
-        Ok(stmts) => {
-            let mut interpreter = Interpreter::new();
-            match interpreter.interpret(stmts) {
-                Ok(_) => Ok(()),
-                Err(e) => Err(e.to_string().into()),
-            }
+    let mut lexer = Scanner::new(contents);
+    let tokens = lexer.scan_tokens();
+    let tokens = match tokens {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("{e:#}");
+            std::process::exit(65);
         }
-        Err(e) => Err(e.to_string().into()),
-    }
-}
+    };
 
-fn setup(input: &str) -> parser::Parser {
-    let mut lexer = Scanner::new(input);
-    parser::Parser::new(TokenStream::new(lexer.scan_tokens().unwrap()))
+    let mut parser = parser::Parser::new(TokenStream::new(tokens));
+    let stmts = parser.parse();
+    let stmts = match stmts {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("{e:#}");
+            std::process::exit(65);
+        }
+    };
+
+    let mut interpreter = Interpreter::new();
+    let res = interpreter.interpret(stmts);
+
+    match res {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            eprintln!("{e:#}");
+            std::process::exit(65);
+        }
+    }
 }
