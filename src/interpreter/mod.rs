@@ -28,7 +28,7 @@ impl Neg for Value {
     fn neg(self) -> Self {
         match self {
             Value::Number(n) => Value::Number(-n),
-            _ => Value::Nil,
+            _ => unreachable!(),
         }
     }
 }
@@ -53,7 +53,7 @@ impl Add for Value {
         match (self, rhs) {
             (Value::Number(l), Value::Number(r)) => Value::Number(l + r),
             (Value::String(l), Value::String(r)) => Value::String(l + &r),
-            _ => Value::Nil,
+            _ => unreachable!(),
         }
     }
 }
@@ -64,7 +64,7 @@ impl Sub for Value {
     fn sub(self, rhs: Self) -> Self {
         match (self, rhs) {
             (Value::Number(l), Value::Number(r)) => Value::Number(l - r),
-            _ => Value::Nil,
+            _ => unreachable!(),
         }
     }
 }
@@ -75,7 +75,7 @@ impl Div for Value {
     fn div(self, rhs: Self) -> Self {
         match (self, rhs) {
             (Value::Number(l), Value::Number(r)) => Value::Number(l / r),
-            _ => Value::Nil,
+            _ => unreachable!(),
         }
     }
 }
@@ -86,7 +86,7 @@ impl Mul for Value {
     fn mul(self, rhs: Self) -> Self {
         match (self, rhs) {
             (Value::Number(l), Value::Number(r)) => Value::Number(l * r),
-            _ => Value::Nil,
+            _ => unreachable!(),
         }
     }
 }
