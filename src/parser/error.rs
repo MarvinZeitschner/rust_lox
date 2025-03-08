@@ -1,14 +1,19 @@
+use strum::EnumDiscriminants;
 use thiserror::Error;
 
 use crate::lex::Token;
 
-#[derive(Error, Debug, PartialEq, PartialOrd, Clone, Copy)]
+#[derive(Error, Debug, PartialEq, PartialOrd, Clone, Copy, EnumDiscriminants)]
+#[strum_discriminants(name(ParserErrorContext))]
 pub enum ParserError<'a> {
     #[error("[line {}] Error: Expected ')' after expression", token.line)]
     UnmatchedParanthesis { token: Token<'a> },
 
     #[error("[line {}] Error: Expected '(' after if", token.line)]
-    ExpectedLeftparen { token: Token<'a> },
+    ExpectedLeftParenAfterIf { token: Token<'a> },
+
+    #[error("[line {}] Error: Expected ')' after if condition", token.line)]
+    ExpectedRightParenAfterCondition { token: Token<'a> },
 
     #[error("[line {}] Error: Expected expression", token.line)]
     ExpectedExpression { token: Token<'a> },

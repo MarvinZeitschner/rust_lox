@@ -66,7 +66,7 @@ pub struct Token<'a> {
     pub kind: TokenType,
     pub lexeme: &'a str,
     pub line: u32,
-    span: Span,
+    pub span: Span,
 }
 
 impl<'a> Token<'a> {

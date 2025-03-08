@@ -318,7 +318,6 @@ impl<'a> StmtVisitor<'a> for Interpreter<'a> {
     fn visit_if(&mut self, node: StmtIf<'a>) -> Self::Output {
         let condition = self.evaluate(node.condition)?;
         let Value::Boolean(condition) = condition else {
-            // TODO: Check
             return Ok(());
         };
         if condition {

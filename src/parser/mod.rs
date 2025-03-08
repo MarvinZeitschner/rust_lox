@@ -1,6 +1,6 @@
 pub mod error;
 
-use error::{ParserError, TokenStreamError};
+use error::{ParserError, ParserErrorContext, TokenStreamError};
 
 use crate::{
     ast::{
@@ -66,31 +66,50 @@ impl<'a> TokenStream<'a> {
         Ok(false)
     }
 
-    fn consume(&mut self, kind: &TokenType) -> Result<Token<'a>, ParserError<'a>> {
+    fn consume(
+        &mut self,
+        kind: &TokenType,
+        error_context: ParserErrorContext,
+    ) -> Result<Token<'a>, ParserError<'a>> {
         if self.check(kind)? {
             let token = self.advance()?;
             return Ok(token);
         }
-        match kind {
-            TokenType::RightParen => Err(ParserError::UnmatchedParanthesis {
+        let err = match error_context {
+            ParserErrorContext::UnmatchedParanthesis => ParserError::UnmatchedParanthesis {
                 token: self.previous()?,
-            }),
-            TokenType::LeftParen => Err(ParserError::ExpectedLeftparen {
+            },
+            ParserErrorContext::ExpectedLeftParenAfterIf => ParserError::ExpectedLeftParenAfterIf {
                 token: self.previous()?,
-            }),
-            TokenType::Semicolon => Err(ParserError::ExpectedSemicolon {
+            },
+            ParserErrorContext::ExpectedRightParenAfterCondition => {
+                ParserError::ExpectedRightParenAfterCondition {
+                    token: self.previous()?,
+                }
+            }
+            ParserErrorContext::ExpectedExpression => ParserError::ExpectedExpression {
                 token: self.previous()?,
-            }),
-            TokenType::RightBrace => Err(ParserError::ExpectedRightBrace {
+            },
+            ParserErrorContext::ExpectedSemicolon => ParserError::ExpectedSemicolon {
                 token: self.previous()?,
-            }),
-            TokenType::Ident => Err(ParserError::InvalidAssignmentTarget {
+            },
+            ParserErrorContext::UnexpectedToken => ParserError::UnexpectedToken {
                 token: self.previous()?,
-            }),
-            _ => Err(ParserError::UnexpectedToken {
+            },
+            ParserErrorContext::UnexpectedEOF => ParserError::UnexpectedEOF {
                 token: self.previous()?,
-            }),
-        }
+            },
+            ParserErrorContext::InvalidAssignmentTarget => ParserError::InvalidAssignmentTarget {
+                token: self.previous()?,
+            },
+            ParserErrorContext::ExpectedRightBrace => ParserError::ExpectedRightBrace {
+                token: self.previous()?,
+            },
+            _ => ParserError::UnexpectedToken {
+                token: self.previous()?,
+            },
+        };
+        Err(err)
     }
 }
 
@@ -125,12 +144,16 @@ impl<'a> Parser<'a> {
     }
 
     fn var_declaration(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
-        let name = self.tokenstream.consume(&TokenType::Ident)?;
+        let name = self.tokenstream.consume(
+            &TokenType::Ident,
+            ParserErrorContext::InvalidAssignmentTarget,
+        )?;
         let mut initializer = None;
         if self.tokenstream.match_l(&[TokenType::Equal])? {
             initializer = Some(self.expression()?);
         }
-        self.tokenstream.consume(&TokenType::Semicolon)?;
+        self.tokenstream
+            .consume(&TokenType::Semicolon, ParserErrorContext::ExpectedSemicolon)?;
         Ok(Stmt::Var(StmtVar::new(name, initializer)))
     }
 
@@ -149,11 +172,15 @@ impl<'a> Parser<'a> {
     }
 
     fn if_statement(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
-        self.tokenstream.consume(&TokenType::LeftParen)?;
+        self.tokenstream.consume(
+            &TokenType::LeftParen,
+            ParserErrorContext::ExpectedLeftParenAfterIf,
+        )?;
         let condition = self.expression()?;
-        // TODO: This shouldnt result in an UnmatchedParanthesis error, but rather an
-        // "ExpectedLeftParen after if condition"
-        self.tokenstream.consume(&TokenType::RightParen)?;
+        self.tokenstream.consume(
+            &TokenType::RightParen,
+            ParserErrorContext::ExpectedRightParenAfterCondition,
+        )?;
 
         let then_branch = Box::new(self.statement()?);
         let mut else_branch = None;
@@ -171,20 +198,25 @@ impl<'a> Parser<'a> {
             statements.push(self.declaration()?);
         }
 
-        self.tokenstream.consume(&TokenType::RightBrace)?;
+        self.tokenstream.consume(
+            &TokenType::RightBrace,
+            ParserErrorContext::ExpectedRightBrace,
+        )?;
 
         Ok(statements)
     }
 
     fn print_statement(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
         let value = self.expression()?;
-        self.tokenstream.consume(&TokenType::Semicolon)?;
+        self.tokenstream
+            .consume(&TokenType::Semicolon, ParserErrorContext::ExpectedSemicolon)?;
         Ok(Stmt::Print(StmtPrint::new(value)))
     }
 
     fn expression_statement(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
         let value = self.expression()?;
-        self.tokenstream.consume(&TokenType::Semicolon)?;
+        self.tokenstream
+            .consume(&TokenType::Semicolon, ParserErrorContext::ExpectedSemicolon)?;
         Ok(Stmt::Expression(StmtExpression::new(value)))
     }
 
@@ -297,7 +329,10 @@ impl<'a> Parser<'a> {
             )))),
             TokenType::LeftParen => {
                 let expr = self.expression()?;
-                self.tokenstream.consume(&TokenType::RightParen)?;
+                self.tokenstream.consume(
+                    &TokenType::RightParen,
+                    ParserErrorContext::UnmatchedParanthesis,
+                )?;
                 return Ok(Expr::Grouping(ExprGrouping::new(Box::new(expr))));
             }
             TokenType::Ident => Ok(Expr::Variable(ExprVariable::new(token))),
