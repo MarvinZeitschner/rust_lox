@@ -232,10 +232,7 @@ impl<'a> ExprVisitor<'a> for Interpreter<'a> {
                 self.check_number_operand(&right, operator)?;
                 Ok(-right)
             }
-            TokenType::Bang => {
-                self.check_number_operand(&right, operator)?;
-                Ok(!right)
-            }
+            TokenType::Bang => Ok(!right),
             _ => Err(RuntimeError::NumberOperand { operator }),
         }
     }
