@@ -22,6 +22,17 @@ pub enum Value {
     Nil,
 }
 
+impl Value {
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            Value::Number(_) => true,
+            Value::String(_) => true,
+            Value::Boolean(b) => *b,
+            Value::Nil => false,
+        }
+    }
+}
+
 impl Neg for Value {
     type Output = Self;
 
@@ -223,6 +234,18 @@ impl<'a> ExprVisitor<'a> for Interpreter<'a> {
         self.evaluate(*node.value)
     }
 
+    fn visit_logical(&mut self, node: ExprLogical<'a>) -> Self::Output {
+        let left = self.evaluate(*node.left)?;
+
+        if node.operator.kind == TokenType::Or && left.is_truthy() {
+            return Ok(left);
+        } else if node.operator.kind == TokenType::And && !left.is_truthy() {
+            return Ok(left);
+        }
+
+        self.evaluate(*node.right)
+    }
+
     fn visit_unary(&mut self, node: ExprUnary<'a>) -> Self::Output {
         let operator = node.operator;
         let right = self.evaluate(*node.value)?;
@@ -318,6 +341,7 @@ impl<'a> StmtVisitor<'a> for Interpreter<'a> {
     fn visit_if(&mut self, node: StmtIf<'a>) -> Self::Output {
         let condition = self.evaluate(node.condition)?;
         let Value::Boolean(condition) = condition else {
+            // TODO:
             return Ok(());
         };
         if condition {

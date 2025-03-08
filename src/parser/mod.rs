@@ -4,8 +4,8 @@ use error::{ParserError, ParserErrorContext, TokenStreamError};
 
 use crate::{
     ast::{
-        Expr, ExprAssign, ExprBinary, ExprGrouping, ExprLiteral, ExprUnary, ExprVariable,
-        LiteralValue, Stmt, StmtBlock, StmtExpression, StmtIf, StmtPrint, StmtVar,
+        Expr, ExprAssign, ExprBinary, ExprGrouping, ExprLiteral, ExprLogical, ExprUnary,
+        ExprVariable, LiteralValue, Stmt, StmtBlock, StmtExpression, StmtIf, StmtPrint, StmtVar,
     },
     lex::{Token, TokenType},
 };
@@ -225,7 +225,7 @@ impl<'a> Parser<'a> {
     }
 
     fn assignment(&mut self) -> Result<Expr<'a>, ParserError<'a>> {
-        let expr = self.equality()?;
+        let expr = self.or()?;
 
         let operators = [TokenType::Equal];
 
@@ -239,6 +239,30 @@ impl<'a> Parser<'a> {
             }
 
             return Err(ParserError::InvalidAssignmentTarget { token: equals });
+        }
+
+        Ok(expr)
+    }
+
+    fn or(&mut self) -> Result<Expr<'a>, ParserError<'a>> {
+        let mut expr = self.and()?;
+
+        while self.tokenstream.match_l(&[TokenType::Or])? {
+            let operator = self.tokenstream.previous()?;
+            let right = self.and()?;
+            expr = Expr::Logical(ExprLogical::new(Box::new(expr), operator, Box::new(right)));
+        }
+
+        Ok(expr)
+    }
+
+    fn and(&mut self) -> Result<Expr<'a>, ParserError<'a>> {
+        let mut expr = self.equality()?;
+
+        while self.tokenstream.match_l(&[TokenType::And])? {
+            let operator = self.tokenstream.previous()?;
+            let right = self.equality()?;
+            expr = Expr::Logical(ExprLogical::new(Box::new(expr), operator, Box::new(right)));
         }
 
         Ok(expr)

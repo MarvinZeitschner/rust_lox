@@ -44,4 +44,8 @@ impl ExprVisitor<'_> for AstPrinter {
     fn visit_variable(&mut self, _node: ExprVariable) -> Self::Output {
         todo!()
     }
+
+    fn visit_logical(&mut self, _node: ExprLogical) -> Self::Output {
+        todo!()
+    }
 }

@@ -21,6 +21,11 @@ pub enum Expression<'a> {
     Grouping {
         value: Box<Expr<'a>>,
     },
+    Logical {
+        left: Box<Expr<'a>>,
+        operator: Token<'a>,
+        right: Box<Expr<'a>>,
+    },
     Unary {
         operator: Token<'a>,
         value: Box<Expr<'a>>,
