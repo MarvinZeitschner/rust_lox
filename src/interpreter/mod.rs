@@ -173,27 +173,18 @@ impl<'a> Interpreter<'a> {
 
     fn execute_block(
         &mut self,
-        statements: &Vec<Stmt<'a>>,
-        environment: Environment<'a>,
+        statements: &[Stmt<'a>],
+        mut environment: Environment<'a>,
     ) -> Result<(), RuntimeError<'a>> {
-        // TODO: Clone
-        let previous_env = self.environment.clone();
+        std::mem::swap(&mut self.environment, &mut environment);
 
-        self.environment = environment;
+        let result = statements.iter().try_for_each(|stmt| self.execute(stmt));
 
-        for stmt in statements {
-            match self.execute(stmt) {
-                Ok(_) => {}
-                Err(e) => {
-                    self.environment = previous_env;
-                    return Err(e);
-                }
-            }
+        if let Some(enclosing) = self.environment.enclosing.take() {
+            self.environment = *enclosing;
         }
 
-        self.environment = previous_env;
-
-        Ok(())
+        result
     }
 
     fn evaluate(&mut self, expr: &Expr<'a>) -> Result<Value, RuntimeError<'a>> {
