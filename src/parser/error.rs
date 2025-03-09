@@ -12,8 +12,11 @@ pub enum ParserError<'a> {
     #[error("[line {}] Error: Expected '(' after if", token.line)]
     ExpectedLeftParenAfterIf { token: Token<'a> },
 
-    #[error("[line {}] Error: Expected ')' after if condition", token.line)]
+    #[error("[line {}] Error: Expected ')' after condition", token.line)]
     ExpectedRightParenAfterCondition { token: Token<'a> },
+
+    #[error("[line {}] Error: Expected '(' after while", token.line)]
+    ExpectedLeftParenAfterWhile { token: Token<'a> },
 
     #[error("[line {}] Error: Expected expression", token.line)]
     ExpectedExpression { token: Token<'a> },

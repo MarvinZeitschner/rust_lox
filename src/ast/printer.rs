@@ -16,7 +16,7 @@ impl AstPrinter {
 impl ExprVisitor<'_> for AstPrinter {
     type Output = String;
 
-    fn visit_literal(&mut self, node: ExprLiteral) -> Self::Output {
+    fn visit_literal(&mut self, node: &ExprLiteral) -> Self::Output {
         match &node.value {
             LiteralValue::String(value) => value.clone(),
             LiteralValue::F64(value) => value.to_string(),
@@ -25,27 +25,27 @@ impl ExprVisitor<'_> for AstPrinter {
         }
     }
 
-    fn visit_grouping(&mut self, node: ExprGrouping) -> Self::Output {
+    fn visit_grouping(&mut self, node: &ExprGrouping) -> Self::Output {
         self.parenthesize("group", &[&node.value])
     }
 
-    fn visit_unary(&mut self, node: ExprUnary) -> Self::Output {
+    fn visit_unary(&mut self, node: &ExprUnary) -> Self::Output {
         self.parenthesize(node.operator.lexeme, &[&node.value])
     }
 
-    fn visit_binary(&mut self, node: ExprBinary) -> Self::Output {
+    fn visit_binary(&mut self, node: &ExprBinary) -> Self::Output {
         self.parenthesize(node.operator.lexeme, &[&node.left, &node.right])
     }
 
-    fn visit_assign(&mut self, _node: ExprAssign) -> Self::Output {
+    fn visit_assign(&mut self, _node: &ExprAssign) -> Self::Output {
         todo!()
     }
 
-    fn visit_variable(&mut self, _node: ExprVariable) -> Self::Output {
+    fn visit_variable(&mut self, _node: &ExprVariable) -> Self::Output {
         todo!()
     }
 
-    fn visit_logical(&mut self, _node: ExprLogical) -> Self::Output {
+    fn visit_logical(&mut self, _node: &ExprLogical) -> Self::Output {
         todo!()
     }
 }

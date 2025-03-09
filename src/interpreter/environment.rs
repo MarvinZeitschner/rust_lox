@@ -7,7 +7,7 @@ use super::{error::RuntimeError, Value};
 #[derive(Default, Clone)]
 pub struct Environment<'a> {
     values: HashMap<&'a str, Option<Value>>,
-    enclosing: Option<Box<Environment<'a>>>,
+    pub enclosing: Option<Box<Environment<'a>>>,
 }
 
 impl<'a> Environment<'a> {
@@ -29,6 +29,7 @@ impl<'a> Environment<'a> {
     pub fn get(&self, name: Token<'a>) -> Result<Value, RuntimeError<'a>> {
         match self.values.get(name.lexeme) {
             Some(value) => match value {
+                // TODO:
                 Some(value) => Ok(value.clone()),
                 None => Ok(Value::Nil),
             },

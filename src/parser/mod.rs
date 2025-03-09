@@ -6,6 +6,7 @@ use crate::{
     ast::{
         Expr, ExprAssign, ExprBinary, ExprGrouping, ExprLiteral, ExprLogical, ExprUnary,
         ExprVariable, LiteralValue, Stmt, StmtBlock, StmtExpression, StmtIf, StmtPrint, StmtVar,
+        StmtWhile,
     },
     lex::{Token, TokenType},
 };
@@ -167,6 +168,9 @@ impl<'a> Parser<'a> {
         if self.tokenstream.match_l(&[TokenType::LeftBrace])? {
             return Ok(Stmt::Block(StmtBlock::new(self.block()?)));
         }
+        if self.tokenstream.match_l(&[TokenType::While])? {
+            return self.while_statement();
+        }
 
         self.expression_statement()
     }
@@ -211,6 +215,22 @@ impl<'a> Parser<'a> {
         self.tokenstream
             .consume(&TokenType::Semicolon, ParserErrorContext::ExpectedSemicolon)?;
         Ok(Stmt::Print(StmtPrint::new(value)))
+    }
+
+    fn while_statement(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
+        self.tokenstream.consume(
+            &TokenType::LeftParen,
+            ParserErrorContext::ExpectedLeftParenAfterWhile,
+        )?;
+        let condition = self.expression()?;
+        self.tokenstream.consume(
+            &TokenType::RightParen,
+            ParserErrorContext::ExpectedRightParenAfterCondition,
+        )?;
+
+        let body = self.statement()?;
+
+        Ok(Stmt::While(StmtWhile::new(condition, Box::new(body))))
     }
 
     fn expression_statement(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {

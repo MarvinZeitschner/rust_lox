@@ -65,4 +65,8 @@ pub enum Statement<'a> {
         name: Token<'a>,
         initializer: Option<Expr<'a>>,
     },
+    While {
+        condition: Expr<'a>,
+        body: Box<Stmt<'a>>,
+    },
 }
