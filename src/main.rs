@@ -39,6 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
+    // return Ok(());
     let mut interpreter = Interpreter::new();
     let res = interpreter.interpret(stmts);
 

@@ -27,8 +27,10 @@ impl<'a> Environment<'a> {
     }
 
     pub fn get(&self, name: Token<'a>) -> Result<Value, RuntimeError<'a>> {
+        println!("{:#?}", self.values);
         match self.values.get(name.lexeme) {
             Some(value) => match value {
+                // TODO:
                 Some(value) => Ok(value.clone()),
                 None => Ok(Value::Nil),
             },
@@ -40,11 +42,14 @@ impl<'a> Environment<'a> {
     }
 
     pub fn assign(&mut self, name: Token<'a>, value: Value) -> Result<(), RuntimeError<'a>> {
+        println!("{:#?}", name);
+        println!("{:#?}", self.values);
         match self.values.contains_key(name.lexeme) {
             true => {
                 self.values
                     .entry(name.lexeme)
                     .and_modify(|v| *v = Some(value));
+                println!("{:#?}", self.values);
                 Ok(())
             }
             false => match &mut self.enclosing {

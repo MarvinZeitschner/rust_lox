@@ -224,7 +224,7 @@ impl<'a> Parser<'a> {
         )?;
         let condition = self.expression()?;
         self.tokenstream.consume(
-            &TokenType::LeftParen,
+            &TokenType::RightParen,
             ParserErrorContext::ExpectedRightParenAfterCondition,
         )?;
 
