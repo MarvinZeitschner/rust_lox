@@ -76,40 +76,7 @@ impl<'a> TokenStream<'a> {
             let token = self.advance()?;
             return Ok(token);
         }
-        let err = match error_context {
-            ParserErrorContext::UnmatchedParanthesis => ParserError::UnmatchedParanthesis {
-                token: self.previous()?,
-            },
-            ParserErrorContext::ExpectedLeftParenAfterIf => ParserError::ExpectedLeftParenAfterIf {
-                token: self.previous()?,
-            },
-            ParserErrorContext::ExpectedRightParenAfterCondition => {
-                ParserError::ExpectedRightParenAfterCondition {
-                    token: self.previous()?,
-                }
-            }
-            ParserErrorContext::ExpectedExpression => ParserError::ExpectedExpression {
-                token: self.previous()?,
-            },
-            ParserErrorContext::ExpectedSemicolon => ParserError::ExpectedSemicolon {
-                token: self.previous()?,
-            },
-            ParserErrorContext::UnexpectedToken => ParserError::UnexpectedToken {
-                token: self.previous()?,
-            },
-            ParserErrorContext::UnexpectedEOF => ParserError::UnexpectedEOF {
-                token: self.previous()?,
-            },
-            ParserErrorContext::InvalidAssignmentTarget => ParserError::InvalidAssignmentTarget {
-                token: self.previous()?,
-            },
-            ParserErrorContext::ExpectedRightBrace => ParserError::ExpectedRightBrace {
-                token: self.previous()?,
-            },
-            _ => ParserError::UnexpectedToken {
-                token: self.previous()?,
-            },
-        };
+        let err = error_context.to_error(self.previous()?);
         Err(err)
     }
 }
@@ -171,6 +138,9 @@ impl<'a> Parser<'a> {
         if self.tokenstream.match_l(&[TokenType::While])? {
             return self.while_statement();
         }
+        // if self.tokenstream.match_l(&[TokenType::For])? {
+        //     return self.for_statement();
+        // }
 
         self.expression_statement()
     }
@@ -232,6 +202,15 @@ impl<'a> Parser<'a> {
 
         Ok(Stmt::While(StmtWhile::new(condition, Box::new(body))))
     }
+
+    // fn for_statement(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
+    //     self.tokenstream.consume(
+    //         &TokenType::LeftParen,
+    //         ParserErrorContext::ExpectedLeftParenAfterFor,
+    //     );
+    //
+    //     todo!()
+    // }
 
     fn expression_statement(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
         let value = self.expression()?;

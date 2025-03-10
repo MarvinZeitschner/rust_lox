@@ -12,6 +12,9 @@ pub enum ParserError<'a> {
     #[error("[line {}] Error: Expected '(' after if", token.line)]
     ExpectedLeftParenAfterIf { token: Token<'a> },
 
+    #[error("[line {}] Error: Expected '(' after for", token.line)]
+    ExpectedLeftParenAfterFor { token: Token<'a> },
+
     #[error("[line {}] Error: Expected ')' after condition", token.line)]
     ExpectedRightParenAfterCondition { token: Token<'a> },
 
@@ -38,6 +41,38 @@ pub enum ParserError<'a> {
 
     #[error("{0}")]
     TokenStream(#[from] TokenStreamError),
+}
+
+impl<'a> ParserErrorContext {
+    pub fn to_error(self, token: Token<'a>) -> ParserError<'a> {
+        match self {
+            ParserErrorContext::UnmatchedParanthesis => ParserError::UnmatchedParanthesis { token },
+            ParserErrorContext::ExpectedLeftParenAfterIf => {
+                ParserError::ExpectedLeftParenAfterIf { token }
+            }
+
+            ParserErrorContext::ExpectedLeftParenAfterFor => {
+                ParserError::ExpectedLeftParenAfterFor { token }
+            }
+            ParserErrorContext::ExpectedRightParenAfterCondition => {
+                ParserError::ExpectedRightParenAfterCondition { token }
+            }
+            ParserErrorContext::ExpectedLeftParenAfterWhile => {
+                ParserError::ExpectedLeftParenAfterWhile { token }
+            }
+            ParserErrorContext::ExpectedExpression => ParserError::ExpectedExpression { token },
+            ParserErrorContext::ExpectedSemicolon => ParserError::ExpectedSemicolon { token },
+            ParserErrorContext::UnexpectedToken => ParserError::UnexpectedToken { token },
+            ParserErrorContext::UnexpectedEOF => ParserError::UnexpectedEOF { token },
+            ParserErrorContext::InvalidAssignmentTarget => {
+                ParserError::InvalidAssignmentTarget { token }
+            }
+            ParserErrorContext::ExpectedRightBrace => ParserError::ExpectedRightBrace { token },
+            ParserErrorContext::TokenStream => {
+                ParserError::TokenStream(TokenStreamError::OutOfBounds)
+            }
+        }
+    }
 }
 
 #[derive(Error, Debug, PartialEq, PartialOrd, Clone, Copy)]
