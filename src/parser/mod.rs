@@ -4,7 +4,7 @@ use error::{ParserError, ParserErrorContext, TokenStreamError};
 
 use crate::{
     ast::{
-        Expr, ExprAssign, ExprBinary, ExprGrouping, ExprLiteral, ExprLogical, ExprUnary,
+        Expr, ExprAssign, ExprBinary, ExprCall, ExprGrouping, ExprLiteral, ExprLogical, ExprUnary,
         ExprVariable, LiteralValue, Stmt, StmtBlock, StmtExpression, StmtIf, StmtPrint, StmtVar,
         StmtWhile,
     },
@@ -269,6 +269,49 @@ impl<'a> Parser<'a> {
         self.assignment()
     }
 
+    fn call(&mut self) -> Result<Expr<'a>, ParserError<'a>> {
+        let mut expr = self.primary()?;
+
+        loop {
+            if self.tokenstream.match_l(&[TokenType::LeftParen])? {
+                expr = self.finish_call(expr)?;
+            } else {
+                break;
+            }
+        }
+
+        Ok(expr)
+    }
+
+    fn finish_call(&mut self, callee: Expr<'a>) -> Result<Expr<'a>, ParserError<'a>> {
+        let mut arguments = vec![];
+
+        if !self.tokenstream.check(&TokenType::RightParen)? {
+            if arguments.len() >= 255 {
+                let token = self.tokenstream.peek()?;
+                let err = ParserError::TooManyFunctionArguments {
+                    token: token.clone(),
+                };
+                eprintln!("{err:?}");
+            }
+            arguments.push(self.expression()?);
+            while self.tokenstream.match_l(&[TokenType::Comma])? {
+                arguments.push(self.expression()?);
+            }
+        }
+
+        let paren = self.tokenstream.consume(
+            &TokenType::RightParen,
+            ParserErrorContext::ExpectedRightParenAfterArguments,
+        )?;
+
+        Ok(Expr::Call(ExprCall::new(
+            Box::new(callee),
+            paren,
+            arguments,
+        )))
+    }
+
     fn assignment(&mut self) -> Result<Expr<'a>, ParserError<'a>> {
         let expr = self.or()?;
 
@@ -383,7 +426,7 @@ impl<'a> Parser<'a> {
             return Ok(Expr::Unary(ExprUnary::new(operator, Box::new(right))));
         }
 
-        self.primary()
+        self.call()
     }
 
     fn primary(&mut self) -> Result<Expr<'a>, ParserError<'a>> {

@@ -15,14 +15,17 @@ pub enum ParserError<'a> {
     #[error("[line {}] Error: Expected '(' after for", token.line)]
     ExpectedLeftParenAfterFor { token: Token<'a> },
 
+    #[error("[line {}] Error: Expected '(' after while", token.line)]
+    ExpectedLeftParenAfterWhile { token: Token<'a> },
+
     #[error("[line {}] Error: Expected ')' after condition", token.line)]
     ExpectedRightParenAfterCondition { token: Token<'a> },
 
     #[error("[line {}] Error: Expected ')' after for clauses", token.line)]
     ExpectedRightParenAfterForClause { token: Token<'a> },
 
-    #[error("[line {}] Error: Expected '(' after while", token.line)]
-    ExpectedLeftParenAfterWhile { token: Token<'a> },
+    #[error("[line {}] Error: Expected ')' after for arguments", token.line)]
+    ExpectedRightParenAfterArguments { token: Token<'a> },
 
     #[error("[line {}] Error: Expected expression", token.line)]
     ExpectedExpression { token: Token<'a> },
@@ -41,6 +44,9 @@ pub enum ParserError<'a> {
 
     #[error("[line {}] Error: Invalid assignment target", token.line)]
     InvalidAssignmentTarget { token: Token<'a> },
+
+    #[error("[line {}] Error: Can't have more than 255 arguments", token.line)]
+    TooManyFunctionArguments { token: Token<'a> },
 
     #[error("[line {}] Error: Expected {{ after block", token.line)]
     ExpectedRightBrace { token: Token<'a> },
@@ -81,6 +87,12 @@ impl<'a> ParserErrorContext {
             }
             ParserErrorContext::ExpectedRightParenAfterForClause => {
                 ParserError::ExpectedRightParenAfterForClause { token }
+            }
+            ParserErrorContext::ExpectedRightParenAfterArguments => {
+                ParserError::ExpectedRightParenAfterArguments { token }
+            }
+            ParserErrorContext::TooManyFunctionArguments => {
+                ParserError::TooManyFunctionArguments { token }
             }
         }
     }
