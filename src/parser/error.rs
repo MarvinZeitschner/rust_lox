@@ -18,6 +18,9 @@ pub enum ParserError<'a> {
     #[error("[line {}] Error: Expected ')' after condition", token.line)]
     ExpectedRightParenAfterCondition { token: Token<'a> },
 
+    #[error("[line {}] Error: Expected ')' after for clauses", token.line)]
+    ExpectedRightParenAfterForClause { token: Token<'a> },
+
     #[error("[line {}] Error: Expected '(' after while", token.line)]
     ExpectedLeftParenAfterWhile { token: Token<'a> },
 
@@ -26,6 +29,9 @@ pub enum ParserError<'a> {
 
     #[error("[line {}] Error: Expected semicolon", token.line)]
     ExpectedSemicolon { token: Token<'a> },
+
+    #[error("[line {}] Error: Expected semicolon after loop condition", token.line)]
+    ExpectedSemicolonAfterLoopCondition { token: Token<'a> },
 
     #[error("[line {}] Error: Unexpected token: {}", token.line, token.lexeme)]
     UnexpectedToken { token: Token<'a> },
@@ -50,7 +56,6 @@ impl<'a> ParserErrorContext {
             ParserErrorContext::ExpectedLeftParenAfterIf => {
                 ParserError::ExpectedLeftParenAfterIf { token }
             }
-
             ParserErrorContext::ExpectedLeftParenAfterFor => {
                 ParserError::ExpectedLeftParenAfterFor { token }
             }
@@ -70,6 +75,12 @@ impl<'a> ParserErrorContext {
             ParserErrorContext::ExpectedRightBrace => ParserError::ExpectedRightBrace { token },
             ParserErrorContext::TokenStream => {
                 ParserError::TokenStream(TokenStreamError::OutOfBounds)
+            }
+            ParserErrorContext::ExpectedSemicolonAfterLoopCondition => {
+                ParserError::ExpectedSemicolonAfterLoopCondition { token }
+            }
+            ParserErrorContext::ExpectedRightParenAfterForClause => {
+                ParserError::ExpectedRightParenAfterForClause { token }
             }
         }
     }

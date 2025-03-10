@@ -1,0 +1,30 @@
+var a = 0;
+var temp;
+
+for (var b = 1; a < 10000; b = temp + b) {
+  print a;
+  temp = a;
+  a = b;
+}
+
+// exptect: 0
+// exptect: 1
+// exptect: 1
+// exptect: 2
+// exptect: 3
+// exptect: 5
+// exptect: 8
+// exptect: 13
+// exptect: 21
+// exptect: 34
+// exptect: 55
+// exptect: 89
+// exptect: 144
+// exptect: 233
+// exptect: 377
+// exptect: 610
+// exptect: 987
+// exptect: 1597
+// exptect: 2584
+// exptect: 4181
+// exptect: 6765

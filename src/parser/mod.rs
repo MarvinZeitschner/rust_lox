@@ -138,9 +138,9 @@ impl<'a> Parser<'a> {
         if self.tokenstream.match_l(&[TokenType::While])? {
             return self.while_statement();
         }
-        // if self.tokenstream.match_l(&[TokenType::For])? {
-        //     return self.for_statement();
-        // }
+        if self.tokenstream.match_l(&[TokenType::For])? {
+            return self.for_statement();
+        }
 
         self.expression_statement()
     }
@@ -203,14 +203,60 @@ impl<'a> Parser<'a> {
         Ok(Stmt::While(StmtWhile::new(condition, Box::new(body))))
     }
 
-    // fn for_statement(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
-    //     self.tokenstream.consume(
-    //         &TokenType::LeftParen,
-    //         ParserErrorContext::ExpectedLeftParenAfterFor,
-    //     );
-    //
-    //     todo!()
-    // }
+    fn for_statement(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
+        self.tokenstream.consume(
+            &TokenType::LeftParen,
+            ParserErrorContext::ExpectedLeftParenAfterFor,
+        )?;
+        let mut initializer = None;
+        if self.tokenstream.match_l(&[TokenType::Var])? {
+            initializer = Some(self.var_declaration()?);
+        } else {
+            initializer = Some(self.expression_statement()?);
+        }
+
+        let mut condition = None;
+        if !self.tokenstream.check(&TokenType::Semicolon)? {
+            condition = Some(self.expression()?);
+        }
+        self.tokenstream.consume(
+            &TokenType::Semicolon,
+            ParserErrorContext::ExpectedSemicolonAfterLoopCondition,
+        )?;
+
+        let mut increment = None;
+        if !self.tokenstream.check(&TokenType::RightParen)? {
+            increment = Some(self.expression()?);
+        }
+        self.tokenstream.consume(
+            &TokenType::RightParen,
+            ParserErrorContext::ExpectedRightParenAfterForClause,
+        )?;
+
+        let mut body = self.statement()?;
+
+        if let Some(increment) = increment {
+            body = Stmt::Block(StmtBlock::new(vec![
+                body,
+                Stmt::Expression(StmtExpression::new(increment)),
+            ]));
+        }
+
+        if let Some(condition) = condition {
+            body = Stmt::While(StmtWhile::new(condition, Box::new(body)));
+        } else {
+            body = Stmt::While(StmtWhile::new(
+                Expr::Literal(ExprLiteral::new(LiteralValue::Bool(true))),
+                Box::new(body),
+            ));
+        }
+
+        if let Some(initializer) = initializer {
+            body = Stmt::Block(StmtBlock::new(vec![initializer, body]));
+        }
+
+        Ok(body)
+    }
 
     fn expression_statement(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
         let value = self.expression()?;
