@@ -14,11 +14,32 @@ use crate::{
     lex::{Token, TokenType},
 };
 
+pub trait Callable {
+    fn call(&self, interpreter: &mut Interpreter, arguments: Vec<&Expr>) -> Value;
+    fn arity(&self) -> usize;
+}
+
+#[derive(Debug, Clone)]
+pub struct LoxCallable {
+    pub arity: usize,
+}
+
+impl Callable for LoxCallable {
+    fn call(&self, interpreter: &mut Interpreter, arguments: Vec<&Expr>) -> Value {
+        todo!()
+    }
+
+    fn arity(&self) -> usize {
+        todo!()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Value {
     Number(f64),
     String(String),
     Boolean(bool),
+    Callable(LoxCallable),
     Nil,
 }
 
@@ -28,6 +49,7 @@ impl Value {
             Value::Number(_) => true,
             Value::String(_) => true,
             Value::Boolean(b) => *b,
+            Value::Callable(_) => true,
             Value::Nil => false,
         }
     }
@@ -52,6 +74,7 @@ impl Not for Value {
             Value::Boolean(b) => Value::Boolean(!b),
             Value::Number(_) => Value::Boolean(false),
             Value::String(_) => Value::Boolean(false),
+            Value::Callable(_) => Value::Boolean(false),
             Value::Nil => Value::Boolean(true),
         }
     }
@@ -143,12 +166,13 @@ impl Display for Value {
             Value::Number(n) => write!(f, "{}", n),
             Value::String(s) => write!(f, "{}", s),
             Value::Boolean(b) => write!(f, "{}", b),
+            Value::Callable(lox_callable) => write!(f, "{:?}", lox_callable),
             Value::Nil => write!(f, "nil"),
         }
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Interpreter<'a> {
     environment: Environment<'a>,
 }
@@ -300,6 +324,29 @@ impl<'a> ExprVisitor<'a> for Interpreter<'a> {
             TokenType::BangEqual => Ok(Value::Boolean(left != right)),
             _ => Ok(Value::Nil),
         }
+    }
+
+    fn visit_call(&mut self, node: &ExprCall<'a>) -> Self::Output {
+        let callee = self.evaluate(&node.callee)?;
+
+        let mut arguments = vec![];
+        node.arguments.iter().for_each(|argument| {
+            arguments.push(argument);
+        });
+
+        let Value::Callable(function) = callee else {
+            return Err(RuntimeError::NotCallable { token: node.paren });
+        };
+
+        if arguments.len() != function.arity() {
+            return Err(RuntimeError::ArgumentCount {
+                token: node.paren,
+                expected_arity: function.arity(),
+                given_len: arguments.len(),
+            });
+        }
+
+        Ok(function.call(self, arguments))
     }
 
     fn visit_assign(&mut self, node: &ExprAssign<'a>) -> Self::Output {
