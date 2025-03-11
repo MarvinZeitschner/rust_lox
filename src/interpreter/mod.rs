@@ -2,11 +2,13 @@ pub mod environment;
 pub mod error;
 
 use std::{
+    cell::RefCell,
     fmt::Display,
     ops::{Add, Div, Mul, Neg, Not, Sub},
+    rc::Rc,
 };
 
-use environment::{Environment, EnvironmentBuilder};
+use environment::Environment;
 use error::RuntimeError;
 
 use crate::{
@@ -172,15 +174,24 @@ impl Display for Value {
     }
 }
 
-#[derive(Default, Clone)]
 pub struct Interpreter<'a> {
-    environment: Environment<'a>,
+    environment: Rc<RefCell<Environment<'a>>>,
+    globals: Rc<RefCell<Environment<'a>>>,
+}
+
+impl<'a> Default for Interpreter<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<'a> Interpreter<'a> {
     pub fn new() -> Self {
+        let globals = Rc::new(RefCell::new(Environment::new(None)));
+
         Self {
-            environment: Environment::new(),
+            environment: Rc::clone(&globals),
+            globals,
         }
     }
 
@@ -198,15 +209,28 @@ impl<'a> Interpreter<'a> {
     fn execute_block(
         &mut self,
         statements: &[Stmt<'a>],
-        mut environment: Environment<'a>,
+        environment: Environment<'a>,
     ) -> Result<(), RuntimeError<'a>> {
-        std::mem::swap(&mut self.environment, &mut environment);
+        // I will leaves this here as it was a cool approach before the need of RC's
+        // std::mem::swap(&mut self.environment, &mut environment);
+        //
+        // let result = statements.iter().try_for_each(|stmt| self.execute(stmt));
+        //
+        // if let Some(enclosing) = self.environment.enclosing.take() {
+        //     self.environment = *enclosing;
+        // }
+        //
+        // result
+
+        let previous = Rc::clone(&self.environment);
+
+        let new_environment = Rc::new(RefCell::new(environment));
+
+        self.environment = new_environment;
 
         let result = statements.iter().try_for_each(|stmt| self.execute(stmt));
 
-        if let Some(enclosing) = self.environment.enclosing.take() {
-            self.environment = *enclosing;
-        }
+        self.environment = previous;
 
         result
     }
@@ -351,12 +375,14 @@ impl<'a> ExprVisitor<'a> for Interpreter<'a> {
 
     fn visit_assign(&mut self, node: &ExprAssign<'a>) -> Self::Output {
         let value = self.evaluate(&node.value)?;
-        self.environment.assign(node.name, value.clone())?;
+        self.environment
+            .borrow_mut()
+            .assign(node.name, value.clone())?;
         Ok(value)
     }
 
     fn visit_variable(&mut self, node: &ExprVariable<'a>) -> Self::Output {
-        self.environment.get(node.name)
+        self.environment.borrow().get(node.name)
     }
 }
 
@@ -366,10 +392,8 @@ impl<'a> StmtVisitor<'a> for Interpreter<'a> {
     fn visit_block(&mut self, node: &StmtBlock<'a>) -> Self::Output {
         self.execute_block(
             &node.statements,
-            // TODO: Clone
-            EnvironmentBuilder::new()
-                .enclosing(self.environment.clone())
-                .build(),
+            // Clone should be okay as it clones a pointer
+            Environment::new(Some(self.environment.clone())),
         )?;
         Ok(())
     }
@@ -405,7 +429,9 @@ impl<'a> StmtVisitor<'a> for Interpreter<'a> {
         if let Some(initializer) = &node.initializer {
             value = Some(self.evaluate(initializer)?);
         }
-        self.environment.define(node.name.lexeme, value);
+        self.environment
+            .borrow_mut()
+            .define(node.name.lexeme, value);
         Ok(())
     }
 

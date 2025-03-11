@@ -1,20 +1,21 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::lex::Token;
 
 use super::{error::RuntimeError, Value};
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct Environment<'a> {
     values: HashMap<&'a str, Option<Value>>,
-    pub enclosing: Option<Box<Environment<'a>>>,
+    // pub enclosing: Option<Box<Environment<'a>>>,
+    pub enclosing: Option<Rc<RefCell<Environment<'a>>>>,
 }
 
 impl<'a> Environment<'a> {
-    pub fn new() -> Self {
+    pub fn new(enclosing: Option<Rc<RefCell<Environment<'a>>>>) -> Self {
         Self {
             values: HashMap::new(),
-            enclosing: None,
+            enclosing,
         }
     }
 
@@ -34,7 +35,7 @@ impl<'a> Environment<'a> {
                 None => Ok(Value::Nil),
             },
             None => match &self.enclosing {
-                Some(enclosing) => return enclosing.get(name),
+                Some(enclosing) => return enclosing.borrow().get(name),
                 _ => Err(RuntimeError::UndefinedVariable { name }),
             },
         }
@@ -49,32 +50,9 @@ impl<'a> Environment<'a> {
                 Ok(())
             }
             false => match &mut self.enclosing {
-                Some(enclosing) => enclosing.assign(name, value),
+                Some(enclosing) => enclosing.borrow_mut().assign(name, value),
                 _ => Err(RuntimeError::UndefinedVariable { name }),
             },
-        }
-    }
-}
-
-#[derive(Default)]
-pub struct EnvironmentBuilder<'a> {
-    encolsing: Option<Box<Environment<'a>>>,
-}
-
-impl<'a> EnvironmentBuilder<'a> {
-    pub fn new() -> Self {
-        Self { encolsing: None }
-    }
-
-    pub fn enclosing(mut self, enclosing: Environment<'a>) -> EnvironmentBuilder<'a> {
-        self.encolsing = Some(Box::new(enclosing));
-        self
-    }
-
-    pub fn build(self) -> Environment<'a> {
-        Environment {
-            values: HashMap::new(),
-            enclosing: self.encolsing,
         }
     }
 }
