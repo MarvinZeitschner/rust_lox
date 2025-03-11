@@ -9,17 +9,18 @@ pub trait LoxCallable {
     fn call(&self, interpreter: &mut Interpreter, arguments: Vec<&Expr>) -> Value;
     fn arity(&self) -> usize;
     fn to_string(&self) -> String;
+    fn clone_box(&self) -> Box<dyn LoxCallable>;
 }
 
 impl Clone for Box<dyn LoxCallable> {
     fn clone(&self) -> Box<dyn LoxCallable> {
-        todo!()
+        self.clone_box()
     }
 }
 
 impl fmt::Debug for Box<dyn LoxCallable> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Callable")
+        write!(f, "{}", self.to_string())
     }
 }
 
