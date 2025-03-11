@@ -405,11 +405,7 @@ impl<'a> StmtVisitor<'a> for Interpreter<'a> {
 
     fn visit_if(&mut self, node: &StmtIf<'a>) -> Self::Output {
         let condition = self.evaluate(&node.condition)?;
-        let Value::Boolean(condition) = condition else {
-            // TODO:
-            return Ok(());
-        };
-        if condition {
+        if condition.is_truthy() {
             self.execute(&node.then_branch)?;
         } else if let Some(stmt) = &node.else_branch {
             self.execute(stmt)?;
