@@ -7,7 +7,6 @@ use super::{error::RuntimeError, Value};
 #[derive(Clone)]
 pub struct Environment<'a> {
     values: HashMap<&'a str, Option<Value>>,
-    // pub enclosing: Option<Box<Environment<'a>>>,
     pub enclosing: Option<*mut Environment<'a>>,
 }
 

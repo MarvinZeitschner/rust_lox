@@ -1,176 +1,17 @@
 pub mod environment;
 pub mod error;
-
-use std::{
-    fmt::Display,
-    ops::{Add, Div, Mul, Neg, Not, Sub},
-};
+pub mod native_fun;
+pub mod value;
 
 use environment::Environment;
 use error::RuntimeError;
+use native_fun::clock::Clock;
+use value::Value;
 
 use crate::{
     ast::*,
     lex::{Token, TokenType},
 };
-
-pub trait Callable {
-    fn call(&self, interpreter: &mut Interpreter, arguments: Vec<&Expr>) -> Value;
-    fn arity(&self) -> usize;
-}
-
-#[derive(Debug, Clone)]
-pub struct LoxCallable {
-    pub arity: usize,
-}
-
-impl Callable for LoxCallable {
-    fn call(&self, interpreter: &mut Interpreter, arguments: Vec<&Expr>) -> Value {
-        todo!()
-    }
-
-    fn arity(&self) -> usize {
-        todo!()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum Value {
-    Number(f64),
-    String(String),
-    Boolean(bool),
-    Callable(LoxCallable),
-    Nil,
-}
-
-impl Value {
-    pub fn is_truthy(&self) -> bool {
-        match self {
-            Value::Number(_) => true,
-            Value::String(_) => true,
-            Value::Boolean(b) => *b,
-            Value::Callable(_) => true,
-            Value::Nil => false,
-        }
-    }
-}
-
-impl Neg for Value {
-    type Output = Self;
-
-    fn neg(self) -> Self {
-        match self {
-            Value::Number(n) => Value::Number(-n),
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl Not for Value {
-    type Output = Self;
-
-    fn not(self) -> Self {
-        match self {
-            Value::Boolean(b) => Value::Boolean(!b),
-            Value::Number(_) => Value::Boolean(false),
-            Value::String(_) => Value::Boolean(false),
-            Value::Callable(_) => Value::Boolean(false),
-            Value::Nil => Value::Boolean(true),
-        }
-    }
-}
-
-impl Add for Value {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self {
-        match (self, rhs) {
-            (Value::Number(l), Value::Number(r)) => Value::Number(l + r),
-            (Value::String(l), Value::String(r)) => Value::String(l + &r),
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl Sub for Value {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self {
-        match (self, rhs) {
-            (Value::Number(l), Value::Number(r)) => Value::Number(l - r),
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl Div for Value {
-    type Output = Self;
-
-    fn div(self, rhs: Self) -> Self {
-        match (self, rhs) {
-            (Value::Number(l), Value::Number(r)) => Value::Number(l / r),
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl Mul for Value {
-    type Output = Self;
-
-    fn mul(self, rhs: Self) -> Self {
-        match (self, rhs) {
-            (Value::Number(l), Value::Number(r)) => Value::Number(l * r),
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl PartialEq for Value {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Value::Number(l), Value::Number(r)) => l == r,
-            (Value::String(l), Value::String(r)) => l == r,
-            (Value::Boolean(l), Value::Boolean(r)) => l == r,
-            (Value::Nil, Value::Nil) => true,
-            _ => false,
-        }
-    }
-}
-
-impl PartialOrd for Value {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match (self, other) {
-            (Value::Number(l), Value::Number(r)) => l.partial_cmp(r),
-            (Value::String(l), Value::String(r)) => l.partial_cmp(r),
-            (Value::Boolean(l), Value::Boolean(r)) => l.partial_cmp(r),
-            (Value::Nil, Value::Nil) => Some(std::cmp::Ordering::Equal),
-            _ => None,
-        }
-    }
-}
-
-impl From<LiteralValue> for Value {
-    fn from(literal: LiteralValue) -> Self {
-        match literal {
-            LiteralValue::F64(f) => Value::Number(f),
-            LiteralValue::String(s) => Value::String(s),
-            LiteralValue::Bool(b) => Value::Boolean(b),
-            LiteralValue::Nil => Value::Nil,
-        }
-    }
-}
-
-impl Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Value::Number(n) => write!(f, "{}", n),
-            Value::String(s) => write!(f, "{}", s),
-            Value::Boolean(b) => write!(f, "{}", b),
-            Value::Callable(lox_callable) => write!(f, "{:?}", lox_callable),
-            Value::Nil => write!(f, "nil"),
-        }
-    }
-}
 
 pub struct Interpreter<'a> {
     environment: *mut Environment<'a>,
@@ -186,6 +27,7 @@ impl<'a> Default for Interpreter<'a> {
 impl<'a> Interpreter<'a> {
     pub fn new() -> Self {
         let mut globals = Box::new(Environment::new(None));
+        globals.define("clock", Some(Value::Callable(Box::new(Clock::new()))));
 
         let globals_ptr = &mut *globals as *mut Environment;
 
@@ -246,11 +88,8 @@ impl<'a> Interpreter<'a> {
 
         let result = statements.iter().try_for_each(|stmt| self.execute(stmt));
 
-        unsafe {
-            // TODO: Is this necessary?
-            let _drop = Box::from(env_ptr);
-            self.environment = prev
-        }
+        let _drop = Box::from(env_ptr);
+        self.environment = prev;
 
         result
     }
@@ -409,10 +248,7 @@ impl<'a> StmtVisitor<'a> for Interpreter<'a> {
     type Output = Result<(), RuntimeError<'a>>;
 
     fn visit_block(&mut self, node: &StmtBlock<'a>) -> Self::Output {
-        self.execute_block(
-            &node.statements,
-            Environment::new(Some(self.environment.clone())),
-        )?;
+        self.execute_block(&node.statements, Environment::new(Some(self.environment)))?;
         Ok(())
     }
 
