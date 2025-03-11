@@ -2,10 +2,8 @@ pub mod environment;
 pub mod error;
 
 use std::{
-    cell::RefCell,
     fmt::Display,
     ops::{Add, Div, Mul, Neg, Not, Sub},
-    rc::Rc,
 };
 
 use environment::Environment;
@@ -175,8 +173,8 @@ impl Display for Value {
 }
 
 pub struct Interpreter<'a> {
-    environment: Rc<RefCell<Environment<'a>>>,
-    globals: Rc<RefCell<Environment<'a>>>,
+    environment: *mut Environment<'a>,
+    globals: Box<Environment<'a>>,
 }
 
 impl<'a> Default for Interpreter<'a> {
@@ -187,12 +185,30 @@ impl<'a> Default for Interpreter<'a> {
 
 impl<'a> Interpreter<'a> {
     pub fn new() -> Self {
-        let globals = Rc::new(RefCell::new(Environment::new(None)));
+        let mut globals = Box::new(Environment::new(None));
 
-        Self {
-            environment: Rc::clone(&globals),
+        let globals_ptr = &mut *globals as *mut Environment;
+
+        Interpreter {
             globals,
+            environment: globals_ptr,
         }
+    }
+
+    fn get_mut_environment(&mut self) -> &mut Environment<'a> {
+        unsafe { &mut *self.environment }
+    }
+
+    fn get_environment(&mut self) -> &Environment<'a> {
+        unsafe { &*self.environment }
+    }
+
+    fn get_mut_globals(&mut self) -> &mut Environment<'a> {
+        &mut self.globals
+    }
+
+    fn get_globals(&mut self) -> &Environment<'a> {
+        &self.globals
     }
 
     pub fn interpret(&mut self, stmts: Vec<Stmt<'a>>) -> Result<(), RuntimeError<'a>> {
@@ -222,15 +238,19 @@ impl<'a> Interpreter<'a> {
         //
         // result
 
-        let previous = Rc::clone(&self.environment);
+        let prev = self.environment;
 
-        let new_environment = Rc::new(RefCell::new(environment));
+        let env_ptr = Box::into_raw(Box::new(environment));
 
-        self.environment = new_environment;
+        self.environment = env_ptr;
 
         let result = statements.iter().try_for_each(|stmt| self.execute(stmt));
 
-        self.environment = previous;
+        unsafe {
+            // TODO: Is this necessary?
+            let _drop = Box::from(env_ptr);
+            self.environment = prev
+        }
 
         result
     }
@@ -375,14 +395,13 @@ impl<'a> ExprVisitor<'a> for Interpreter<'a> {
 
     fn visit_assign(&mut self, node: &ExprAssign<'a>) -> Self::Output {
         let value = self.evaluate(&node.value)?;
-        self.environment
-            .borrow_mut()
+        self.get_mut_environment()
             .assign(node.name, value.clone())?;
         Ok(value)
     }
 
     fn visit_variable(&mut self, node: &ExprVariable<'a>) -> Self::Output {
-        self.environment.borrow().get(node.name)
+        self.get_environment().get(node.name)
     }
 }
 
@@ -392,7 +411,6 @@ impl<'a> StmtVisitor<'a> for Interpreter<'a> {
     fn visit_block(&mut self, node: &StmtBlock<'a>) -> Self::Output {
         self.execute_block(
             &node.statements,
-            // Clone should be okay as it clones a pointer
             Environment::new(Some(self.environment.clone())),
         )?;
         Ok(())
@@ -425,9 +443,7 @@ impl<'a> StmtVisitor<'a> for Interpreter<'a> {
         if let Some(initializer) = &node.initializer {
             value = Some(self.evaluate(initializer)?);
         }
-        self.environment
-            .borrow_mut()
-            .define(node.name.lexeme, value);
+        self.get_mut_environment().define(node.name.lexeme, value);
         Ok(())
     }
 

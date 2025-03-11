@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 
 use crate::lex::Token;
 
@@ -8,11 +8,11 @@ use super::{error::RuntimeError, Value};
 pub struct Environment<'a> {
     values: HashMap<&'a str, Option<Value>>,
     // pub enclosing: Option<Box<Environment<'a>>>,
-    pub enclosing: Option<Rc<RefCell<Environment<'a>>>>,
+    pub enclosing: Option<*mut Environment<'a>>,
 }
 
 impl<'a> Environment<'a> {
-    pub fn new(enclosing: Option<Rc<RefCell<Environment<'a>>>>) -> Self {
+    pub fn new(enclosing: Option<*mut Environment<'a>>) -> Self {
         Self {
             values: HashMap::new(),
             enclosing,
@@ -34,8 +34,8 @@ impl<'a> Environment<'a> {
                 Some(value) => Ok(value.clone()),
                 None => Ok(Value::Nil),
             },
-            None => match &self.enclosing {
-                Some(enclosing) => return enclosing.borrow().get(name),
+            None => match self.enclosing {
+                Some(enclosing) => unsafe { return (*enclosing).get(name) },
                 _ => Err(RuntimeError::UndefinedVariable { name }),
             },
         }
@@ -49,8 +49,8 @@ impl<'a> Environment<'a> {
                     .and_modify(|v| *v = Some(value));
                 Ok(())
             }
-            false => match &mut self.enclosing {
-                Some(enclosing) => enclosing.borrow_mut().assign(name, value),
+            false => match self.enclosing {
+                Some(enclosing) => unsafe { (*enclosing).assign(name, value) },
                 _ => Err(RuntimeError::UndefinedVariable { name }),
             },
         }
