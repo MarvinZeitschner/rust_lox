@@ -15,6 +15,9 @@ use crate::{
 
 pub struct Interpreter<'a> {
     environment: *mut Environment<'a>,
+    // rust sees globals as unused, but its actually used for native functions. A reference to a
+    // raw ptr of globals is safed in the environment
+    #[allow(dead_code)]
     globals: Box<Environment<'a>>,
 }
 
@@ -45,14 +48,6 @@ impl<'a> Interpreter<'a> {
         unsafe { &*self.environment }
     }
 
-    fn get_mut_globals(&mut self) -> &mut Environment<'a> {
-        &mut self.globals
-    }
-
-    fn get_globals(&mut self) -> &Environment<'a> {
-        &self.globals
-    }
-
     pub fn interpret(&mut self, stmts: Vec<Stmt<'a>>) -> Result<(), RuntimeError<'a>> {
         for stmt in stmts {
             self.execute(&stmt)?;
@@ -69,7 +64,8 @@ impl<'a> Interpreter<'a> {
         statements: &[Stmt<'a>],
         environment: Environment<'a>,
     ) -> Result<(), RuntimeError<'a>> {
-        // I will leaves this here as it was a cool approach before the need of RC's
+        // I will leaves this here as it was a cool approach before the need of Rc's and now raw
+        // pointers
         // std::mem::swap(&mut self.environment, &mut environment);
         //
         // let result = statements.iter().try_for_each(|stmt| self.execute(stmt));
@@ -126,7 +122,6 @@ impl<'a> ExprVisitor<'a> for Interpreter<'a> {
     type Output = Result<Value<'a>, RuntimeError<'a>>;
 
     fn visit_literal(&mut self, node: &ExprLiteral) -> Self::Output {
-        // TODO:
         Ok(node.value.clone().into())
     }
 
@@ -137,9 +132,9 @@ impl<'a> ExprVisitor<'a> for Interpreter<'a> {
     fn visit_logical(&mut self, node: &ExprLogical<'a>) -> Self::Output {
         let left = self.evaluate(&node.left)?;
 
-        if node.operator.kind == TokenType::Or && left.is_truthy() {
-            return Ok(left);
-        } else if node.operator.kind == TokenType::And && !left.is_truthy() {
+        if (node.operator.kind == TokenType::Or && left.is_truthy())
+            || (node.operator.kind == TokenType::And && !left.is_truthy())
+        {
             return Ok(left);
         }
 

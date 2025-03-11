@@ -208,6 +208,8 @@ impl<'a> Parser<'a> {
             &TokenType::LeftParen,
             ParserErrorContext::ExpectedLeftParenAfterFor,
         )?;
+        // We don't explicitly use the None value. So rust thinks it shouldn't be assigned
+        #[allow(unused_assignments)]
         let mut initializer = None;
         if self.tokenstream.match_l(&[TokenType::Var])? {
             initializer = Some(self.var_declaration()?);
@@ -289,9 +291,7 @@ impl<'a> Parser<'a> {
         if !self.tokenstream.check(&TokenType::RightParen)? {
             if arguments.len() >= 255 {
                 let token = self.tokenstream.peek()?;
-                let err = ParserError::TooManyFunctionArguments {
-                    token: token.clone(),
-                };
+                let err = ParserError::TooManyFunctionArguments { token: *token };
                 eprintln!("{err:?}");
             }
             arguments.push(self.expression()?);
