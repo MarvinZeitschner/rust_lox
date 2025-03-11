@@ -1,163 +1,56 @@
 pub mod environment;
 pub mod error;
+pub mod native_fun;
+pub mod value;
 
-use std::{
-    fmt::Display,
-    ops::{Add, Div, Mul, Neg, Not, Sub},
-};
-
-use environment::{Environment, EnvironmentBuilder};
+use environment::Environment;
 use error::RuntimeError;
+use native_fun::clock::Clock;
+use value::Value;
 
 use crate::{
     ast::*,
     lex::{Token, TokenType},
 };
 
-#[derive(Debug, Clone)]
-pub enum Value {
-    Number(f64),
-    String(String),
-    Boolean(bool),
-    Nil,
-}
-
-impl Value {
-    pub fn is_truthy(&self) -> bool {
-        match self {
-            Value::Number(_) => true,
-            Value::String(_) => true,
-            Value::Boolean(b) => *b,
-            Value::Nil => false,
-        }
-    }
-}
-
-impl Neg for Value {
-    type Output = Self;
-
-    fn neg(self) -> Self {
-        match self {
-            Value::Number(n) => Value::Number(-n),
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl Not for Value {
-    type Output = Self;
-
-    fn not(self) -> Self {
-        match self {
-            Value::Boolean(b) => Value::Boolean(!b),
-            Value::Number(_) => Value::Boolean(false),
-            Value::String(_) => Value::Boolean(false),
-            Value::Nil => Value::Boolean(true),
-        }
-    }
-}
-
-impl Add for Value {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self {
-        match (self, rhs) {
-            (Value::Number(l), Value::Number(r)) => Value::Number(l + r),
-            (Value::String(l), Value::String(r)) => Value::String(l + &r),
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl Sub for Value {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self {
-        match (self, rhs) {
-            (Value::Number(l), Value::Number(r)) => Value::Number(l - r),
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl Div for Value {
-    type Output = Self;
-
-    fn div(self, rhs: Self) -> Self {
-        match (self, rhs) {
-            (Value::Number(l), Value::Number(r)) => Value::Number(l / r),
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl Mul for Value {
-    type Output = Self;
-
-    fn mul(self, rhs: Self) -> Self {
-        match (self, rhs) {
-            (Value::Number(l), Value::Number(r)) => Value::Number(l * r),
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl PartialEq for Value {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Value::Number(l), Value::Number(r)) => l == r,
-            (Value::String(l), Value::String(r)) => l == r,
-            (Value::Boolean(l), Value::Boolean(r)) => l == r,
-            (Value::Nil, Value::Nil) => true,
-            _ => false,
-        }
-    }
-}
-
-impl PartialOrd for Value {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match (self, other) {
-            (Value::Number(l), Value::Number(r)) => l.partial_cmp(r),
-            (Value::String(l), Value::String(r)) => l.partial_cmp(r),
-            (Value::Boolean(l), Value::Boolean(r)) => l.partial_cmp(r),
-            (Value::Nil, Value::Nil) => Some(std::cmp::Ordering::Equal),
-            _ => None,
-        }
-    }
-}
-
-impl From<LiteralValue> for Value {
-    fn from(literal: LiteralValue) -> Self {
-        match literal {
-            LiteralValue::F64(f) => Value::Number(f),
-            LiteralValue::String(s) => Value::String(s),
-            LiteralValue::Bool(b) => Value::Boolean(b),
-            LiteralValue::Nil => Value::Nil,
-        }
-    }
-}
-
-impl Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Value::Number(n) => write!(f, "{}", n),
-            Value::String(s) => write!(f, "{}", s),
-            Value::Boolean(b) => write!(f, "{}", b),
-            Value::Nil => write!(f, "nil"),
-        }
-    }
-}
-
-#[derive(Default)]
 pub struct Interpreter<'a> {
-    environment: Environment<'a>,
+    environment: *mut Environment<'a>,
+    globals: Box<Environment<'a>>,
+}
+
+impl<'a> Default for Interpreter<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<'a> Interpreter<'a> {
     pub fn new() -> Self {
-        Self {
-            environment: Environment::new(),
+        let mut globals = Box::new(Environment::new(None));
+        globals.define("clock", Some(Value::Callable(Box::new(Clock::new()))));
+
+        let globals_ptr = &mut *globals as *mut Environment;
+
+        Interpreter {
+            globals,
+            environment: globals_ptr,
         }
+    }
+
+    fn get_mut_environment(&mut self) -> &mut Environment<'a> {
+        unsafe { &mut *self.environment }
+    }
+
+    fn get_environment(&mut self) -> &Environment<'a> {
+        unsafe { &*self.environment }
+    }
+
+    fn get_mut_globals(&mut self) -> &mut Environment<'a> {
+        &mut self.globals
+    }
+
+    fn get_globals(&mut self) -> &Environment<'a> {
+        &self.globals
     }
 
     pub fn interpret(&mut self, stmts: Vec<Stmt<'a>>) -> Result<(), RuntimeError<'a>> {
@@ -174,15 +67,29 @@ impl<'a> Interpreter<'a> {
     fn execute_block(
         &mut self,
         statements: &[Stmt<'a>],
-        mut environment: Environment<'a>,
+        environment: Environment<'a>,
     ) -> Result<(), RuntimeError<'a>> {
-        std::mem::swap(&mut self.environment, &mut environment);
+        // I will leaves this here as it was a cool approach before the need of RC's
+        // std::mem::swap(&mut self.environment, &mut environment);
+        //
+        // let result = statements.iter().try_for_each(|stmt| self.execute(stmt));
+        //
+        // if let Some(enclosing) = self.environment.enclosing.take() {
+        //     self.environment = *enclosing;
+        // }
+        //
+        // result
+
+        let prev = self.environment;
+
+        let env_ptr = Box::into_raw(Box::new(environment));
+
+        self.environment = env_ptr;
 
         let result = statements.iter().try_for_each(|stmt| self.execute(stmt));
 
-        if let Some(enclosing) = self.environment.enclosing.take() {
-            self.environment = *enclosing;
-        }
+        let _drop = Box::from(env_ptr);
+        self.environment = prev;
 
         result
     }
@@ -302,14 +209,38 @@ impl<'a> ExprVisitor<'a> for Interpreter<'a> {
         }
     }
 
+    fn visit_call(&mut self, node: &ExprCall<'a>) -> Self::Output {
+        let callee = self.evaluate(&node.callee)?;
+
+        let mut arguments = vec![];
+        node.arguments.iter().for_each(|argument| {
+            arguments.push(argument);
+        });
+
+        let Value::Callable(function) = callee else {
+            return Err(RuntimeError::NotCallable { token: node.paren });
+        };
+
+        if arguments.len() != function.arity() {
+            return Err(RuntimeError::ArgumentCount {
+                token: node.paren,
+                expected_arity: function.arity(),
+                given_len: arguments.len(),
+            });
+        }
+
+        Ok(function.call(self, arguments))
+    }
+
     fn visit_assign(&mut self, node: &ExprAssign<'a>) -> Self::Output {
         let value = self.evaluate(&node.value)?;
-        self.environment.assign(node.name, value.clone())?;
+        self.get_mut_environment()
+            .assign(node.name, value.clone())?;
         Ok(value)
     }
 
     fn visit_variable(&mut self, node: &ExprVariable<'a>) -> Self::Output {
-        self.environment.get(node.name)
+        self.get_environment().get(node.name)
     }
 }
 
@@ -317,13 +248,7 @@ impl<'a> StmtVisitor<'a> for Interpreter<'a> {
     type Output = Result<(), RuntimeError<'a>>;
 
     fn visit_block(&mut self, node: &StmtBlock<'a>) -> Self::Output {
-        self.execute_block(
-            &node.statements,
-            // TODO: Clone
-            EnvironmentBuilder::new()
-                .enclosing(self.environment.clone())
-                .build(),
-        )?;
+        self.execute_block(&node.statements, Environment::new(Some(self.environment)))?;
         Ok(())
     }
 
@@ -334,11 +259,7 @@ impl<'a> StmtVisitor<'a> for Interpreter<'a> {
 
     fn visit_if(&mut self, node: &StmtIf<'a>) -> Self::Output {
         let condition = self.evaluate(&node.condition)?;
-        let Value::Boolean(condition) = condition else {
-            // TODO:
-            return Ok(());
-        };
-        if condition {
+        if condition.is_truthy() {
             self.execute(&node.then_branch)?;
         } else if let Some(stmt) = &node.else_branch {
             self.execute(stmt)?;
@@ -358,7 +279,7 @@ impl<'a> StmtVisitor<'a> for Interpreter<'a> {
         if let Some(initializer) = &node.initializer {
             value = Some(self.evaluate(initializer)?);
         }
-        self.environment.define(node.name.lexeme, value);
+        self.get_mut_environment().define(node.name.lexeme, value);
         Ok(())
     }
 

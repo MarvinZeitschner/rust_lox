@@ -29,6 +29,10 @@ impl ExprVisitor<'_> for AstPrinter {
         self.parenthesize("group", &[&node.value])
     }
 
+    fn visit_logical(&mut self, _node: &ExprLogical) -> Self::Output {
+        todo!()
+    }
+
     fn visit_unary(&mut self, node: &ExprUnary) -> Self::Output {
         self.parenthesize(node.operator.lexeme, &[&node.value])
     }
@@ -37,15 +41,15 @@ impl ExprVisitor<'_> for AstPrinter {
         self.parenthesize(node.operator.lexeme, &[&node.left, &node.right])
     }
 
+    fn visit_call(&mut self, _node: &ExprCall) -> Self::Output {
+        todo!()
+    }
+
     fn visit_assign(&mut self, _node: &ExprAssign) -> Self::Output {
         todo!()
     }
 
     fn visit_variable(&mut self, _node: &ExprVariable) -> Self::Output {
-        todo!()
-    }
-
-    fn visit_logical(&mut self, _node: &ExprLogical) -> Self::Output {
         todo!()
     }
 }

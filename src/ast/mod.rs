@@ -35,6 +35,11 @@ pub enum Expression<'a> {
         operator: Token<'a>,
         right: Box<Expr<'a>>,
     },
+    Call {
+        callee: Box<Expr<'a>>,
+        paren: Token<'a>,
+        arguments: Vec<Expr<'a>>,
+    },
     Assign {
         name: Token<'a>,
         value: Box<Expr<'a>>,
