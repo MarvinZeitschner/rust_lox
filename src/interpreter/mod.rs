@@ -94,7 +94,7 @@ impl<'a> Interpreter<'a> {
         result
     }
 
-    fn evaluate(&mut self, expr: &Expr<'a>) -> Result<Value, RuntimeError<'a>> {
+    fn evaluate(&mut self, expr: &Expr<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
         expr.accept(self)
     }
 
@@ -123,7 +123,7 @@ impl<'a> Interpreter<'a> {
 }
 
 impl<'a> ExprVisitor<'a> for Interpreter<'a> {
-    type Output = Result<Value, RuntimeError<'a>>;
+    type Output = Result<Value<'a>, RuntimeError<'a>>;
 
     fn visit_literal(&mut self, node: &ExprLiteral) -> Self::Output {
         // TODO:
@@ -229,7 +229,7 @@ impl<'a> ExprVisitor<'a> for Interpreter<'a> {
             });
         }
 
-        Ok(function.call(self, arguments))
+        function.call(self, arguments)
     }
 
     fn visit_assign(&mut self, node: &ExprAssign<'a>) -> Self::Output {

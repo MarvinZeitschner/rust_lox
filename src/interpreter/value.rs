@@ -2,38 +2,42 @@ use std::fmt::{self};
 
 use crate::ast::{Expr, LiteralValue};
 
-use super::Interpreter;
+use super::{error::RuntimeError, Interpreter};
 use std::ops::{Add, Div, Mul, Neg, Not, Sub};
 
-pub trait LoxCallable {
-    fn call(&self, interpreter: &mut Interpreter, arguments: Vec<&Expr>) -> Value;
+pub trait LoxCallable<'a> {
+    fn call(
+        &self,
+        interpreter: &mut Interpreter<'a>,
+        arguments: Vec<&Expr<'a>>,
+    ) -> Result<Value<'a>, RuntimeError<'a>>;
     fn arity(&self) -> usize;
     fn to_string(&self) -> String;
-    fn clone_box(&self) -> Box<dyn LoxCallable>;
+    fn clone_box(&self) -> Box<dyn LoxCallable<'a>>;
 }
 
-impl Clone for Box<dyn LoxCallable> {
-    fn clone(&self) -> Box<dyn LoxCallable> {
+impl<'a> Clone for Box<dyn LoxCallable<'a>> {
+    fn clone(&self) -> Box<dyn LoxCallable<'a>> {
         self.clone_box()
     }
 }
 
-impl fmt::Debug for Box<dyn LoxCallable> {
+impl<'a> fmt::Debug for Box<dyn LoxCallable<'a>> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.to_string())
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum Value {
+pub enum Value<'a> {
     Number(f64),
     String(String),
     Boolean(bool),
-    Callable(Box<dyn LoxCallable>),
+    Callable(Box<dyn LoxCallable<'a>>),
     Nil,
 }
 
-impl Value {
+impl<'a> Value<'a> {
     pub fn is_truthy(&self) -> bool {
         match self {
             Value::Number(_) => true,
@@ -45,7 +49,7 @@ impl Value {
     }
 }
 
-impl Neg for Value {
+impl<'a> Neg for Value<'a> {
     type Output = Self;
 
     fn neg(self) -> Self {
@@ -56,7 +60,7 @@ impl Neg for Value {
     }
 }
 
-impl Not for Value {
+impl<'a> Not for Value<'a> {
     type Output = Self;
 
     fn not(self) -> Self {
@@ -70,7 +74,7 @@ impl Not for Value {
     }
 }
 
-impl Add for Value {
+impl<'a> Add for Value<'a> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self {
@@ -82,7 +86,7 @@ impl Add for Value {
     }
 }
 
-impl Sub for Value {
+impl<'a> Sub for Value<'a> {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self {
@@ -93,7 +97,7 @@ impl Sub for Value {
     }
 }
 
-impl Div for Value {
+impl<'a> Div for Value<'a> {
     type Output = Self;
 
     fn div(self, rhs: Self) -> Self {
@@ -104,7 +108,7 @@ impl Div for Value {
     }
 }
 
-impl Mul for Value {
+impl<'a> Mul for Value<'a> {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self {
@@ -115,7 +119,7 @@ impl Mul for Value {
     }
 }
 
-impl PartialEq for Value {
+impl<'a> PartialEq for Value<'a> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Value::Number(l), Value::Number(r)) => l == r,
@@ -127,7 +131,7 @@ impl PartialEq for Value {
     }
 }
 
-impl PartialOrd for Value {
+impl<'a> PartialOrd for Value<'a> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         match (self, other) {
             (Value::Number(l), Value::Number(r)) => l.partial_cmp(r),
@@ -139,7 +143,7 @@ impl PartialOrd for Value {
     }
 }
 
-impl From<LiteralValue> for Value {
+impl<'a> From<LiteralValue> for Value<'a> {
     fn from(literal: LiteralValue) -> Self {
         match literal {
             LiteralValue::F64(f) => Value::Number(f),
@@ -150,7 +154,7 @@ impl From<LiteralValue> for Value {
     }
 }
 
-impl fmt::Display for Value {
+impl<'a> fmt::Display for Value<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Value::Number(n) => write!(f, "{}", n),

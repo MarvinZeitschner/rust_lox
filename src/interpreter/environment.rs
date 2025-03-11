@@ -6,7 +6,7 @@ use super::{error::RuntimeError, Value};
 
 #[derive(Clone)]
 pub struct Environment<'a> {
-    values: HashMap<&'a str, Option<Value>>,
+    values: HashMap<&'a str, Option<Value<'a>>>,
     pub enclosing: Option<*mut Environment<'a>>,
 }
 
@@ -18,7 +18,7 @@ impl<'a> Environment<'a> {
         }
     }
 
-    pub fn define(&mut self, name: &'a str, value: Option<Value>) {
+    pub fn define(&mut self, name: &'a str, value: Option<Value<'a>>) {
         if self.values.contains_key(name) {
             self.values.entry(name).and_modify(|v| *v = value);
         } else {
@@ -26,7 +26,7 @@ impl<'a> Environment<'a> {
         }
     }
 
-    pub fn get(&self, name: Token<'a>) -> Result<Value, RuntimeError<'a>> {
+    pub fn get(&self, name: Token<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
         match self.values.get(name.lexeme) {
             Some(value) => match value {
                 // TODO:
@@ -40,7 +40,7 @@ impl<'a> Environment<'a> {
         }
     }
 
-    pub fn assign(&mut self, name: Token<'a>, value: Value) -> Result<(), RuntimeError<'a>> {
+    pub fn assign(&mut self, name: Token<'a>, value: Value<'a>) -> Result<(), RuntimeError<'a>> {
         match self.values.contains_key(name.lexeme) {
             true => {
                 self.values
