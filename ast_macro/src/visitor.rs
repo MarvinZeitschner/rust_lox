@@ -12,7 +12,7 @@ pub fn visitor_method(variant: &Variant, lifetime: Option<&Lifetime>, name: Iden
     };
 
     quote! {
-        fn #visitor_name(&mut self, node: & #struct_name #lt) -> Self::Output;
+        fn #visitor_name(&mut self, node: & #lifetime #struct_name #lt) -> Self::Output;
     }
 }
 
@@ -21,6 +21,6 @@ pub fn accept_method(variant: &Variant) -> TokenStream {
     let visitor_name = format_ident!("visit_{}", &variant.ident.to_string().to_lowercase());
 
     quote! {
-        Self::#variant_name(node) => visitor.#visitor_name(node)
+        Self::#variant_name(node) => visitor.#visitor_name( node)
     }
 }

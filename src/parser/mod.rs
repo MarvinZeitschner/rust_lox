@@ -310,6 +310,10 @@ impl<'a> Parser<'a> {
                 );
             }
         }
+        self.tokenstream.consume(
+            &TokenType::RightParen,
+            ParserErrorContext::ExpectedRightParenAfterParameters,
+        )?;
 
         self.tokenstream.consume(
             &TokenType::LeftBrace,
