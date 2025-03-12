@@ -270,9 +270,9 @@ impl<'a> StmtVisitor<'a> for Interpreter<'a> {
         let function = LoxFunction::new(node.clone());
 
         self.get_mut_environment()
-            .define(&node.name.lexeme, Some(Value::Callable(Box::new(function))));
+            .define(node.name.lexeme, Some(Value::Callable(Box::new(function))));
 
-        todo!()
+        Ok(())
     }
 
     fn visit_if(&mut self, node: &StmtIf<'a>) -> Self::Output {

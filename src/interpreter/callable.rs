@@ -79,9 +79,6 @@ impl<'a> LoxCallable<'a> for LoxFunction<'a> {
 
     fn clone_box(&self) -> Box<dyn LoxCallable<'a>> {
         // TODO: Clone
-        // maybe a better approach is to mark this one as unreachable as functions shouldn't be
-        // cloned anywhere as it would involve copying the interpreter
-        // Box::new(self.clone())
-        unreachable!()
+        Box::new(self.clone())
     }
 }
