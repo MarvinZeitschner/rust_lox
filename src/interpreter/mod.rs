@@ -6,6 +6,7 @@ pub mod value;
 
 use std::collections::VecDeque;
 
+use callable::LoxFunction;
 use environment::Environment;
 use error::RuntimeError;
 use native_fun::clock::Clock;
@@ -56,7 +57,7 @@ impl<'a> Interpreter<'a> {
     }
 
     fn get_globals(&self) -> &Environment<'a> {
-        &*self.globals
+        &self.globals
     }
 
     pub fn interpret(&mut self, stmts: Vec<Stmt<'a>>) -> Result<(), RuntimeError<'a>> {
@@ -265,6 +266,12 @@ impl<'a> StmtVisitor<'a> for Interpreter<'a> {
     }
 
     fn visit_function(&mut self, node: &StmtFunction<'a>) -> Self::Output {
+        // TODO: Clone
+        let function = LoxFunction::new(node.clone());
+
+        self.get_mut_environment()
+            .define(&node.name.lexeme, Some(Value::Callable(Box::new(function))));
+
         todo!()
     }
 

@@ -9,12 +9,12 @@ use super::{
     Interpreter,
 };
 
-pub trait LoxCallable<'a, R = Value<'a>> {
+pub trait LoxCallable<'a>: 'a {
     fn call(
         &self,
         interpreter: &mut Interpreter<'a>,
         arguments: VecDeque<Value<'a>>,
-    ) -> Result<R, RuntimeError<'a>>;
+    ) -> Result<Value<'a>, RuntimeError<'a>>;
     fn arity(&self) -> usize;
     fn to_string(&self) -> String;
     fn clone_box(&self) -> Box<dyn LoxCallable<'a>>;
@@ -32,6 +32,7 @@ impl<'a> fmt::Debug for Box<dyn LoxCallable<'a>> {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct LoxFunction<'a> {
     pub declaration: StmtFunction<'a>,
 }
@@ -42,12 +43,12 @@ impl<'a> LoxFunction<'a> {
     }
 }
 
-impl<'a> LoxCallable<'a, ()> for LoxFunction<'a> {
+impl<'a> LoxCallable<'a> for LoxFunction<'a> {
     fn call(
         &self,
         interpreter: &mut Interpreter<'a>,
         mut arguments: VecDeque<Value<'a>>,
-    ) -> Result<(), RuntimeError<'a>> {
+    ) -> Result<Value<'a>, RuntimeError<'a>> {
         let mut environment = Environment::new(Some(interpreter.get_mut_globals()));
 
         for i in 0..self.declaration.params.len() {
@@ -65,7 +66,7 @@ impl<'a> LoxCallable<'a, ()> for LoxFunction<'a> {
 
         interpreter.execute_block(&self.declaration.body, environment)?;
 
-        Ok(())
+        Ok(Value::Nil)
     }
 
     fn arity(&self) -> usize {
@@ -77,6 +78,10 @@ impl<'a> LoxCallable<'a, ()> for LoxFunction<'a> {
     }
 
     fn clone_box(&self) -> Box<dyn LoxCallable<'a>> {
-        todo!()
+        // TODO: Clone
+        // maybe a better approach is to mark this one as unreachable as functions shouldn't be
+        // cloned anywhere as it would involve copying the interpreter
+        // Box::new(self.clone())
+        unreachable!()
     }
 }
