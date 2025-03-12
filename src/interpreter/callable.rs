@@ -34,11 +34,11 @@ impl<'a> fmt::Debug for Box<dyn LoxCallable<'a>> {
 
 #[derive(Debug, Clone)]
 pub struct LoxFunction<'a> {
-    pub declaration: &'a StmtFunction<'a>,
+    pub declaration: StmtFunction<'a>,
 }
 
 impl<'a> LoxFunction<'a> {
-    pub fn new(declaration: &'a StmtFunction<'a>) -> Self {
+    pub fn new(declaration: StmtFunction<'a>) -> Self {
         Self { declaration }
     }
 }
@@ -79,6 +79,9 @@ impl<'a> LoxCallable<'a> for LoxFunction<'a> {
 
     fn clone_box(&self) -> Box<dyn LoxCallable<'a>> {
         // TODO: Clone
-        Box::new(self.clone())
+        // maybe a better approach is to mark this one as unreachable as functions shouldn't be
+        // cloned anywhere as it would involve copying the interpreter
+        // Box::new(self.clone())
+        unreachable!()
     }
 }
