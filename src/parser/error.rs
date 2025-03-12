@@ -3,7 +3,8 @@ use thiserror::Error;
 
 use crate::lex::Token;
 
-#[derive(Error, Debug, PartialEq, PartialOrd, Clone, Copy, EnumDiscriminants)]
+// TODO: Shard this into smaller domain rule-specific errors
+#[derive(Error, Debug, PartialEq, PartialOrd, Clone, EnumDiscriminants)]
 #[strum_discriminants(name(ParserErrorContext))]
 pub enum ParserError<'a> {
     #[error("[line {}] Error: Expected ')' after expression", token.line)]
@@ -32,6 +33,24 @@ pub enum ParserError<'a> {
 
     #[error("[line {}] Error: Expected semicolon", token.line)]
     ExpectedSemicolon { token: Token<'a> },
+
+    #[error("[line {}] Error: Expected function name", token.line)]
+    ExpectedFunctionName { token: Token<'a> },
+
+    #[error("[line {}] Error: Expected ( after function name", token.line)]
+    ExpectedLeftParenAfterFunctionName { token: Token<'a> },
+
+    #[error("[line {}] Error: Can't have more than 255 parameters", token.line)]
+    TooManyFunctionParameters { token: Token<'a> },
+
+    #[error("[line {}] Error: Expected Parameter Name", token.line)]
+    ExpectedParameterName { token: Token<'a> },
+
+    #[error("[line {}] Error: Expected ) after parameters", token.line)]
+    ExpectedRightParenAfterParameters { token: Token<'a> },
+
+    #[error("[line {}] Error: Expected {{ before function body", token.line)]
+    ExpectedLeftBraceBeforeFunctionBody { token: Token<'a> },
 
     #[error("[line {}] Error: Expected semicolon after loop condition", token.line)]
     ExpectedSemicolonAfterLoopCondition { token: Token<'a> },
@@ -93,6 +112,22 @@ impl<'a> ParserErrorContext {
             }
             ParserErrorContext::TooManyFunctionArguments => {
                 ParserError::TooManyFunctionArguments { token }
+            }
+            ParserErrorContext::ExpectedFunctionName => ParserError::ExpectedFunctionName { token },
+            ParserErrorContext::ExpectedLeftParenAfterFunctionName => {
+                ParserError::ExpectedLeftParenAfterFunctionName { token }
+            }
+            ParserErrorContext::TooManyFunctionParameters => {
+                ParserError::TooManyFunctionParameters { token }
+            }
+            ParserErrorContext::ExpectedParameterName => {
+                ParserError::ExpectedParameterName { token }
+            }
+            ParserErrorContext::ExpectedRightParenAfterParameters => {
+                ParserError::ExpectedRightParenAfterParameters { token }
+            }
+            ParserErrorContext::ExpectedLeftBraceBeforeFunctionBody => {
+                ParserError::ExpectedLeftBraceBeforeFunctionBody { token }
             }
         }
     }

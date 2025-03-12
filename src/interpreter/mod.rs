@@ -1,8 +1,12 @@
+pub mod callable;
 pub mod environment;
 pub mod error;
 pub mod native_fun;
 pub mod value;
 
+use std::collections::VecDeque;
+
+use callable::LoxFunction;
 use environment::Environment;
 use error::RuntimeError;
 use native_fun::clock::Clock;
@@ -44,8 +48,16 @@ impl<'a> Interpreter<'a> {
         unsafe { &mut *self.environment }
     }
 
-    fn get_environment(&mut self) -> &Environment<'a> {
+    fn get_environment(&self) -> &Environment<'a> {
         unsafe { &*self.environment }
+    }
+
+    fn get_mut_globals(&mut self) -> &mut Environment<'a> {
+        &mut self.globals
+    }
+
+    fn get_globals(&self) -> &Environment<'a> {
+        &self.globals
     }
 
     pub fn interpret(&mut self, stmts: Vec<Stmt<'a>>) -> Result<(), RuntimeError<'a>> {
@@ -207,10 +219,11 @@ impl<'a> ExprVisitor<'a> for Interpreter<'a> {
     fn visit_call(&mut self, node: &ExprCall<'a>) -> Self::Output {
         let callee = self.evaluate(&node.callee)?;
 
-        let mut arguments = vec![];
-        node.arguments.iter().for_each(|argument| {
-            arguments.push(argument);
-        });
+        let arguments: VecDeque<Value<'a>> = node
+            .arguments
+            .iter()
+            .map(|argument| self.evaluate(argument))
+            .collect::<Result<VecDeque<_>, _>>()?;
 
         let Value::Callable(function) = callee else {
             return Err(RuntimeError::NotCallable { token: node.paren });
@@ -249,6 +262,16 @@ impl<'a> StmtVisitor<'a> for Interpreter<'a> {
 
     fn visit_expression(&mut self, node: &StmtExpression<'a>) -> Self::Output {
         self.evaluate(&node.expr)?;
+        Ok(())
+    }
+
+    fn visit_function(&mut self, node: &StmtFunction<'a>) -> Self::Output {
+        // TODO: Clone
+        let function = LoxFunction::new(node.clone());
+
+        self.get_mut_environment()
+            .define(node.name.lexeme, Some(Value::Callable(Box::new(function))));
+
         Ok(())
     }
 

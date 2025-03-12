@@ -5,8 +5,8 @@ use error::{ParserError, ParserErrorContext, TokenStreamError};
 use crate::{
     ast::{
         Expr, ExprAssign, ExprBinary, ExprCall, ExprGrouping, ExprLiteral, ExprLogical, ExprUnary,
-        ExprVariable, LiteralValue, Stmt, StmtBlock, StmtExpression, StmtIf, StmtPrint, StmtVar,
-        StmtWhile,
+        ExprVariable, LiteralValue, Stmt, StmtBlock, StmtExpression, StmtFunction, StmtIf,
+        StmtPrint, StmtVar, StmtWhile,
     },
     lex::{Token, TokenType},
 };
@@ -98,14 +98,26 @@ impl<'a> Parser<'a> {
         Ok(statements)
     }
 
-    fn declaration(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
-        let operators = [TokenType::Var];
+    fn try_with_sync<T, F>(&mut self, f: F) -> Result<T, ParserError<'a>>
+    where
+        F: FnOnce(&mut Self) -> Result<T, ParserError<'a>>,
+    {
+        match f(self) {
+            Ok(res) => Ok(res),
+            Err(e) => {
+                self.synchronize()?;
+                Err(e)
+            }
+        }
+    }
 
-        let matches = self.tokenstream.match_l(&operators);
-        match matches {
-            Ok(true) => return self.var_declaration(),
-            Err(_) => self.synchronize()?,
-            _ => (),
+    fn declaration(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
+        if self.tokenstream.match_l(&[TokenType::Var])? {
+            return self.try_with_sync(|s| s.var_declaration());
+        }
+
+        if self.tokenstream.match_l(&[TokenType::Fun])? {
+            return self.try_with_sync(|s| s.function(ParserErrorContext::ExpectedFunctionName));
         }
 
         self.statement()
@@ -267,6 +279,51 @@ impl<'a> Parser<'a> {
         Ok(Stmt::Expression(StmtExpression::new(value)))
     }
 
+    fn function(&mut self, kind: ParserErrorContext) -> Result<Stmt<'a>, ParserError<'a>> {
+        let name = self.tokenstream.consume(&TokenType::Ident, kind)?;
+        self.tokenstream.consume(
+            &TokenType::LeftParen,
+            ParserErrorContext::ExpectedLeftParenAfterFunctionName,
+        )?;
+
+        let mut parameters = vec![];
+        if !self.tokenstream.check(&TokenType::RightParen)? {
+            if parameters.len() >= 255 {
+                let token = self.tokenstream.peek()?;
+                let err = ParserError::TooManyFunctionParameters { token: *token };
+                eprintln!("{err:?}");
+            }
+            parameters.push(
+                self.tokenstream
+                    .consume(&TokenType::Ident, ParserErrorContext::ExpectedParameterName)?,
+            );
+
+            while self.tokenstream.match_l(&[TokenType::Comma])? {
+                if parameters.len() >= 255 {
+                    let token = self.tokenstream.peek()?;
+                    let err = ParserError::TooManyFunctionParameters { token: *token };
+                    eprintln!("{err:?}");
+                }
+                parameters.push(
+                    self.tokenstream
+                        .consume(&TokenType::Ident, ParserErrorContext::ExpectedParameterName)?,
+                );
+            }
+        }
+        self.tokenstream.consume(
+            &TokenType::RightParen,
+            ParserErrorContext::ExpectedRightParenAfterParameters,
+        )?;
+
+        self.tokenstream.consume(
+            &TokenType::LeftBrace,
+            ParserErrorContext::ExpectedLeftBraceBeforeFunctionBody,
+        )?;
+        let body = self.block()?;
+
+        Ok(Stmt::Function(StmtFunction::new(name, parameters, body)))
+    }
+
     fn expression(&mut self) -> Result<Expr<'a>, ParserError<'a>> {
         self.assignment()
     }
@@ -295,7 +352,13 @@ impl<'a> Parser<'a> {
                 eprintln!("{err:?}");
             }
             arguments.push(self.expression()?);
+
             while self.tokenstream.match_l(&[TokenType::Comma])? {
+                if arguments.len() >= 255 {
+                    let token = self.tokenstream.peek()?;
+                    let err = ParserError::TooManyFunctionArguments { token: *token };
+                    eprintln!("{err:?}");
+                }
                 arguments.push(self.expression()?);
             }
         }
