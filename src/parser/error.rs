@@ -3,6 +3,7 @@ use thiserror::Error;
 
 use crate::lex::Token;
 
+// TODO: Shard this into smaller domain rule-specific errors
 #[derive(Error, Debug, PartialEq, PartialOrd, Clone, EnumDiscriminants)]
 #[strum_discriminants(name(ParserErrorContext))]
 pub enum ParserError<'a> {

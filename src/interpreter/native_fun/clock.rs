@@ -1,7 +1,6 @@
-use crate::{
-    ast::Expr,
-    interpreter::{error::RuntimeError, value::LoxCallable, Interpreter, Value},
-};
+use std::collections::VecDeque;
+
+use crate::interpreter::{callable::LoxCallable, error::RuntimeError, Interpreter, Value};
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Clock {
@@ -18,7 +17,7 @@ impl<'a> LoxCallable<'a> for Clock {
     fn call(
         &self,
         _interpreter: &mut Interpreter<'a>,
-        _arguments: Vec<&Expr<'a>>,
+        _arguments: VecDeque<Value<'a>>,
     ) -> Result<Value<'a>, RuntimeError<'a>> {
         Ok(Value::Number(
             std::time::SystemTime::now()

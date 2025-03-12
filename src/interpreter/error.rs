@@ -25,4 +25,16 @@ pub enum RuntimeError<'a> {
         expected_arity: usize,
         given_len: usize,
     },
+
+    #[error("{0}")]
+    CallableError(#[from] CallableError),
+}
+
+#[derive(Error, Debug, PartialEq, PartialOrd, Clone)]
+pub enum CallableError {
+    #[error("Internal Error")]
+    InternalError,
+
+    #[error("Parameter not Found; Internal Error")]
+    ParamNotFound,
 }

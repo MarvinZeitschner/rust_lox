@@ -1,32 +1,9 @@
 use std::fmt::{self};
 
-use crate::ast::{Expr, LiteralValue};
+use crate::ast::LiteralValue;
 
-use super::{error::RuntimeError, Interpreter};
+use super::callable::LoxCallable;
 use std::ops::{Add, Div, Mul, Neg, Not, Sub};
-
-pub trait LoxCallable<'a> {
-    fn call(
-        &self,
-        interpreter: &mut Interpreter<'a>,
-        arguments: Vec<&Expr<'a>>,
-    ) -> Result<Value<'a>, RuntimeError<'a>>;
-    fn arity(&self) -> usize;
-    fn to_string(&self) -> String;
-    fn clone_box(&self) -> Box<dyn LoxCallable<'a>>;
-}
-
-impl<'a> Clone for Box<dyn LoxCallable<'a>> {
-    fn clone(&self) -> Box<dyn LoxCallable<'a>> {
-        self.clone_box()
-    }
-}
-
-impl<'a> fmt::Debug for Box<dyn LoxCallable<'a>> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
-    }
-}
 
 #[derive(Debug, Clone)]
 pub enum Value<'a> {
@@ -46,6 +23,12 @@ impl<'a> Value<'a> {
             Value::Callable(_) => true,
             Value::Nil => false,
         }
+    }
+}
+
+impl<'a> Default for Value<'a> {
+    fn default() -> Self {
+        Self::Nil
     }
 }
 
