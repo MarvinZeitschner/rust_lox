@@ -58,6 +58,11 @@ pub enum Statement<'a> {
     Expression {
         expr: Expr<'a>,
     },
+    Function {
+        name: Token<'a>,
+        params: Vec<Token<'a>>,
+        body: Vec<Stmt<'a>>,
+    },
     If {
         condition: Expr<'a>,
         then_branch: Box<Stmt<'a>>,
