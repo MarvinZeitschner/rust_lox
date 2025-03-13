@@ -1,4 +1,7 @@
-use std::fmt::{self};
+use std::{
+    fmt::{self},
+    rc::Rc,
+};
 
 use crate::ast::LiteralValue;
 
@@ -10,7 +13,7 @@ pub enum Value<'a> {
     Number(f64),
     String(String),
     Boolean(bool),
-    Callable(Box<dyn LoxCallable<'a>>),
+    Callable(Rc<dyn LoxCallable<'a>>),
     Nil,
 }
 

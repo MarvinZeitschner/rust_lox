@@ -4,7 +4,7 @@ pub mod error;
 pub mod native_fun;
 pub mod value;
 
-use std::collections::VecDeque;
+use std::{collections::VecDeque, rc::Rc};
 
 use callable::LoxFunction;
 use environment::Environment;
@@ -34,7 +34,7 @@ impl<'a> Default for Interpreter<'a> {
 impl<'a, 'b: 'a> Interpreter<'a> {
     pub fn new() -> Self {
         let mut globals = Box::new(Environment::new(None));
-        globals.define("clock", Some(Value::Callable(Box::new(Clock::new()))));
+        globals.define("clock", Some(Value::Callable(Rc::new(Clock::new()))));
 
         let globals_ptr = &mut *globals as *mut Environment;
 
@@ -54,10 +54,6 @@ impl<'a, 'b: 'a> Interpreter<'a> {
 
     fn get_mut_globals(&mut self) -> &mut Environment<'a> {
         &mut self.globals
-    }
-
-    fn get_globals(&self) -> &Environment<'a> {
-        &self.globals
     }
 
     pub fn interpret(&mut self, stmts: &'b [Stmt<'a>]) -> Result<(), RuntimeError<'a>> {
@@ -267,7 +263,7 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
         let function = LoxFunction::new(node);
 
         self.get_mut_environment()
-            .define(node.name.lexeme, Some(Value::Callable(Box::new(function))));
+            .define(node.name.lexeme, Some(Value::Callable(Rc::new(function))));
 
         Ok(())
     }

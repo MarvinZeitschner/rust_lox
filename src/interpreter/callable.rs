@@ -17,16 +17,9 @@ pub trait LoxCallable<'a>: 'a {
     ) -> Result<Value<'a>, RuntimeError<'a>>;
     fn arity(&self) -> usize;
     fn to_string(&self) -> String;
-    fn box_clone(&self) -> Box<dyn LoxCallable<'a>>;
 }
 
-impl<'a> Clone for Box<dyn LoxCallable<'a>> {
-    fn clone(&self) -> Self {
-        (**self).box_clone()
-    }
-}
-
-impl<'a> fmt::Debug for Box<dyn LoxCallable<'a>> {
+impl<'a> fmt::Debug for dyn LoxCallable<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.to_string())
     }
@@ -75,11 +68,5 @@ impl<'a, 'b> LoxCallable<'a> for LoxFunction<'a, 'b> {
 
     fn to_string(&self) -> String {
         format!("<fn {} >", self.declaration.name.lexeme)
-    }
-
-    fn box_clone(&self) -> Box<dyn LoxCallable<'a>> {
-        Box::new(Self {
-            declaration: self.declaration,
-        })
     }
 }
