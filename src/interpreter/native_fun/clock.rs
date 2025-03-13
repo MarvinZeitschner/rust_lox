@@ -35,7 +35,7 @@ impl<'a> LoxCallable<'a> for Clock {
         String::from("<native fun: clock>")
     }
 
-    fn clone_box(&self) -> Box<dyn LoxCallable<'a>> {
+    fn box_clone(&self) -> Box<dyn LoxCallable<'a>> {
         Box::new(*self)
     }
 }

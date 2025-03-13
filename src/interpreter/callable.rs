@@ -17,12 +17,12 @@ pub trait LoxCallable<'a>: 'a {
     ) -> Result<Value<'a>, RuntimeError<'a>>;
     fn arity(&self) -> usize;
     fn to_string(&self) -> String;
-    fn clone_box(&self) -> Box<dyn LoxCallable<'a>>;
+    fn box_clone(&self) -> Box<dyn LoxCallable<'a>>;
 }
 
 impl<'a> Clone for Box<dyn LoxCallable<'a>> {
-    fn clone(&self) -> Box<dyn LoxCallable<'a>> {
-        self.clone_box()
+    fn clone(&self) -> Self {
+        (**self).box_clone()
     }
 }
 
@@ -33,17 +33,17 @@ impl<'a> fmt::Debug for Box<dyn LoxCallable<'a>> {
 }
 
 #[derive(Debug, Clone)]
-pub struct LoxFunction<'a> {
-    pub declaration: StmtFunction<'a>,
+pub struct LoxFunction<'a, 'b> {
+    pub declaration: &'a StmtFunction<'b>,
 }
 
-impl<'a> LoxFunction<'a> {
-    pub fn new(declaration: StmtFunction<'a>) -> Self {
+impl<'a, 'b> LoxFunction<'a, 'b> {
+    pub fn new(declaration: &'a StmtFunction<'b>) -> Self {
         Self { declaration }
     }
 }
 
-impl<'a> LoxCallable<'a> for LoxFunction<'a> {
+impl<'a, 'b> LoxCallable<'a> for LoxFunction<'a, 'b> {
     fn call(
         &self,
         interpreter: &mut Interpreter<'a>,
@@ -77,8 +77,9 @@ impl<'a> LoxCallable<'a> for LoxFunction<'a> {
         format!("<fn {} >", self.declaration.name.lexeme)
     }
 
-    fn clone_box(&self) -> Box<dyn LoxCallable<'a>> {
-        // TODO: Clone
-        Box::new(self.clone())
+    fn box_clone(&self) -> Box<dyn LoxCallable<'a>> {
+        Box::new(Self {
+            declaration: self.declaration,
+        })
     }
 }

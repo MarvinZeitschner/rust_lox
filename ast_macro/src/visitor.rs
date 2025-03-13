@@ -11,8 +11,15 @@ pub fn visitor_method(variant: &Variant, lifetime: Option<&Lifetime>, name: Iden
         None => quote! {},
     };
 
+    // TODO: This should be dynamically generated to the actual input, but since the macro is just
+    // for this project.....
+    let sep_lt = match lifetime {
+        Some(_) => quote! { 'b },
+        None => quote! {},
+    };
+
     quote! {
-        fn #visitor_name(&mut self, node: & #struct_name #lt) -> Self::Output;
+        fn #visitor_name(&mut self, node: & #sep_lt #struct_name #lt) -> Self::Output;
     }
 }
 
