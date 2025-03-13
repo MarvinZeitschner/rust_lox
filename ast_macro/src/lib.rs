@@ -56,6 +56,11 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let enum_lifetime = enum_lifetime.clone().into_inner();
 
+    let visitor_lifetime_tokenstream = match enum_lifetime {
+        Some(lt) => quote! { <#lt, 'b> },
+        None => quote! {},
+    };
+
     let enum_lifetime_tokenstream = match enum_lifetime {
         Some(lt) => quote! { <#lt> },
         None => quote! {},
@@ -64,7 +69,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let visitor_name = format_ident!("{}Visitor", name);
 
     let visitor_trait = quote! {
-        pub trait #visitor_name #enum_lifetime_tokenstream {
+        pub trait #visitor_name #visitor_lifetime_tokenstream {
             type Output;
 
             #(#visitor_methods)*
@@ -79,8 +84,8 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             #(#enum_variants),*
         }
 
-        impl #enum_lifetime_tokenstream #name #enum_lifetime_tokenstream {
-            pub fn accept<V: #visitor_name #enum_lifetime_tokenstream>(&self, visitor: &mut V) -> V::Output {
+        impl #visitor_lifetime_tokenstream #name #enum_lifetime_tokenstream {
+            pub fn accept<V: #visitor_name #visitor_lifetime_tokenstream>(&'b self, visitor: &mut V) -> V::Output {
                 match self {
                     #(#accept_methods),*
                 }

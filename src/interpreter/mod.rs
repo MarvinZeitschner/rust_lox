@@ -4,7 +4,7 @@ pub mod error;
 pub mod native_fun;
 pub mod value;
 
-use std::collections::VecDeque;
+use std::{collections::VecDeque, rc::Rc};
 
 use callable::LoxFunction;
 use environment::Environment;
@@ -31,10 +31,10 @@ impl<'a> Default for Interpreter<'a> {
     }
 }
 
-impl<'a> Interpreter<'a> {
+impl<'a, 'b: 'a> Interpreter<'a> {
     pub fn new() -> Self {
         let mut globals = Box::new(Environment::new(None));
-        globals.define("clock", Some(Value::Callable(Box::new(Clock::new()))));
+        globals.define("clock", Some(Value::Callable(Rc::new(Clock::new()))));
 
         let globals_ptr = &mut *globals as *mut Environment;
 
@@ -56,24 +56,18 @@ impl<'a> Interpreter<'a> {
         &mut self.globals
     }
 
-    fn get_globals(&self) -> &Environment<'a> {
-        &self.globals
-    }
-
-    pub fn interpret(&mut self, stmts: Vec<Stmt<'a>>) -> Result<(), RuntimeError<'a>> {
-        for stmt in stmts {
-            self.execute(&stmt)?;
-        }
+    pub fn interpret(&mut self, stmts: &'b [Stmt<'a>]) -> Result<(), RuntimeError<'a>> {
+        stmts.iter().try_for_each(|stmt| self.execute(stmt))?;
         Ok(())
     }
 
-    fn execute(&mut self, stmt: &Stmt<'a>) -> Result<(), RuntimeError<'a>> {
+    fn execute(&mut self, stmt: &'b Stmt<'a>) -> Result<(), RuntimeError<'a>> {
         stmt.accept(self)
     }
 
     fn execute_block(
         &mut self,
-        statements: &[Stmt<'a>],
+        statements: &'b [Stmt<'a>],
         environment: Environment<'a>,
     ) -> Result<(), RuntimeError<'a>> {
         // I will leaves this here as it was a cool approach before the need of Rc's and now raw
@@ -130,7 +124,7 @@ impl<'a> Interpreter<'a> {
     }
 }
 
-impl<'a> ExprVisitor<'a> for Interpreter<'a> {
+impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
     type Output = Result<Value<'a>, RuntimeError<'a>>;
 
     fn visit_literal(&mut self, node: &ExprLiteral) -> Self::Output {
@@ -252,10 +246,10 @@ impl<'a> ExprVisitor<'a> for Interpreter<'a> {
     }
 }
 
-impl<'a> StmtVisitor<'a> for Interpreter<'a> {
+impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
     type Output = Result<(), RuntimeError<'a>>;
 
-    fn visit_block(&mut self, node: &StmtBlock<'a>) -> Self::Output {
+    fn visit_block(&mut self, node: &'b StmtBlock<'a>) -> Self::Output {
         self.execute_block(&node.statements, Environment::new(Some(self.environment)))?;
         Ok(())
     }
@@ -265,17 +259,16 @@ impl<'a> StmtVisitor<'a> for Interpreter<'a> {
         Ok(())
     }
 
-    fn visit_function(&mut self, node: &StmtFunction<'a>) -> Self::Output {
-        // TODO: Clone
-        let function = LoxFunction::new(node.clone());
+    fn visit_function(&mut self, node: &'b StmtFunction<'a>) -> Self::Output {
+        let function = LoxFunction::new(node);
 
         self.get_mut_environment()
-            .define(node.name.lexeme, Some(Value::Callable(Box::new(function))));
+            .define(node.name.lexeme, Some(Value::Callable(Rc::new(function))));
 
         Ok(())
     }
 
-    fn visit_if(&mut self, node: &StmtIf<'a>) -> Self::Output {
+    fn visit_if(&mut self, node: &'b StmtIf<'a>) -> Self::Output {
         let condition = self.evaluate(&node.condition)?;
         if condition.is_truthy() {
             self.execute(&node.then_branch)?;
@@ -301,7 +294,7 @@ impl<'a> StmtVisitor<'a> for Interpreter<'a> {
         Ok(())
     }
 
-    fn visit_while(&mut self, node: &StmtWhile<'a>) -> Self::Output {
+    fn visit_while(&mut self, node: &'b StmtWhile<'a>) -> Self::Output {
         while self.evaluate(&node.condition)?.is_truthy() {
             self.execute(&node.body)?;
         }
