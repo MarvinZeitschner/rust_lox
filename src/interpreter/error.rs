@@ -2,6 +2,8 @@ use thiserror::Error;
 
 use crate::lex::Token;
 
+use super::value::Value;
+
 #[derive(Error, Debug, PartialEq, PartialOrd, Clone)]
 pub enum RuntimeError<'a> {
     #[error("[line {}] Operand must be a number", operator.line)]
@@ -28,6 +30,10 @@ pub enum RuntimeError<'a> {
 
     #[error("{0}")]
     CallableError(#[from] CallableError),
+
+    // Not an actual Error, but rather a special type to unwind the interpreter to the call method of LoxCallable when a value is returned
+    #[error("Internal Error: Unhandled return")]
+    Return(Return<'a>),
 }
 
 #[derive(Error, Debug, PartialEq, PartialOrd, Clone)]
@@ -37,4 +43,9 @@ pub enum CallableError {
 
     #[error("Parameter not Found; Internal Error")]
     ParamNotFound,
+}
+
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
+pub struct Return<'a> {
+    pub value: Option<Value<'a>>,
 }
