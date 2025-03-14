@@ -57,9 +57,14 @@ impl<'a, 'b> LoxCallable<'a> for LoxFunction<'a, 'b> {
             environment.define(lexeme, Some(argument));
         }
 
-        interpreter.execute_block(&self.declaration.body, environment)?;
-
-        Ok(Value::Nil)
+        match interpreter.execute_block(&self.declaration.body, environment) {
+            Ok(_) => Ok(Value::Nil),
+            Err(err) => match err {
+                // Safe to unwrap since there is already a check in the interpreter for this
+                RuntimeError::Return(value) => Ok(value.value.unwrap()),
+                _ => Err(err),
+            },
+        }
     }
 
     fn arity(&self) -> usize {

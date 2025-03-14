@@ -8,7 +8,7 @@ use std::{collections::VecDeque, rc::Rc};
 
 use callable::LoxFunction;
 use environment::Environment;
-use error::RuntimeError;
+use error::{Return, RuntimeError};
 use native_fun::clock::Clock;
 use value::Value;
 
@@ -283,6 +283,16 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
         let value = self.evaluate(&node.expr)?;
         println!("{}", value);
         Ok(())
+    }
+
+    fn visit_return(&mut self, node: &'b StmtReturn<'a>) -> Self::Output {
+        let mut value = None;
+
+        if node.value.is_some() {
+            value = Some(self.evaluate(node.value.as_ref().unwrap())?);
+        }
+
+        Err(RuntimeError::Return(Return { value }))
     }
 
     fn visit_var(&mut self, node: &StmtVar<'a>) -> Self::Output {
