@@ -28,21 +28,25 @@ impl<'a> fmt::Debug for dyn LoxCallable<'a> {
 #[derive(Debug, Clone)]
 pub struct LoxFunction<'a, 'b> {
     pub declaration: &'a StmtFunction<'b>,
+    pub closure: *mut Environment<'b>,
 }
 
-impl<'a, 'b> LoxFunction<'a, 'b> {
-    pub fn new(declaration: &'a StmtFunction<'b>) -> Self {
-        Self { declaration }
+impl<'a: 'b, 'b> LoxFunction<'a, 'b> {
+    pub fn new(declaration: &'a StmtFunction<'b>, closure: *mut Environment<'a>) -> Self {
+        Self {
+            declaration,
+            closure,
+        }
     }
 }
 
-impl<'a, 'b> LoxCallable<'a> for LoxFunction<'a, 'b> {
+impl<'a: 'b, 'b> LoxCallable<'a> for LoxFunction<'a, 'b> {
     fn call(
         &self,
         interpreter: &mut Interpreter<'a>,
         mut arguments: VecDeque<Value<'a>>,
     ) -> Result<Value<'a>, RuntimeError<'a>> {
-        let mut environment = Environment::new(Some(interpreter.get_mut_globals()));
+        let mut environment = Environment::new(Some(self.closure));
 
         for i in 0..self.declaration.params.len() {
             let lexeme = &self

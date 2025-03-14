@@ -15,7 +15,7 @@ pub enum RuntimeError<'a> {
     #[error("[line {}] Operands must be two numbers or two strings", operator.line)]
     NumberOrStringOperands { operator: Token<'a> },
 
-    #[error("[Undefined Variable '{}'", name.lexeme)]
+    #[error("[line {}] Undefined Variable '{}'", name.line, name.lexeme)]
     UndefinedVariable { name: Token<'a> },
 
     #[error("[line {}] Can only call functions and classes", token.line)]

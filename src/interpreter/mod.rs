@@ -56,6 +56,10 @@ impl<'a, 'b: 'a> Interpreter<'a> {
         &mut self.globals
     }
 
+    fn get_ptr_environment(&mut self) -> *mut Environment<'a> {
+        self.environment
+    }
+
     pub fn interpret(&mut self, stmts: &'b [Stmt<'a>]) -> Result<(), RuntimeError<'a>> {
         stmts.iter().try_for_each(|stmt| self.execute(stmt))?;
         Ok(())
@@ -260,7 +264,8 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
     }
 
     fn visit_function(&mut self, node: &'b StmtFunction<'a>) -> Self::Output {
-        let function = LoxFunction::new(node);
+        // TODO: Clone
+        let function = LoxFunction::new(node, self.get_ptr_environment());
 
         self.get_mut_environment()
             .define(node.name.lexeme, Some(Value::Callable(Rc::new(function))));
