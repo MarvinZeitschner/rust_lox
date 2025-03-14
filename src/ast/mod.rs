@@ -71,6 +71,10 @@ pub enum Statement<'a> {
     Print {
         expr: Expr<'a>,
     },
+    Return {
+        keyword: Token<'a>,
+        value: Option<Expr<'a>>,
+    },
     Var {
         name: Token<'a>,
         initializer: Option<Expr<'a>>,

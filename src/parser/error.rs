@@ -55,6 +55,9 @@ pub enum ParserError<'a> {
     #[error("[line {}] Error: Expected semicolon after loop condition", token.line)]
     ExpectedSemicolonAfterLoopCondition { token: Token<'a> },
 
+    #[error("[line {}] Error: Expected semicolon after return value", token.line)]
+    ExpectedSemicolonAfterReturnValue { token: Token<'a> },
+
     #[error("[line {}] Error: Unexpected token: {}", token.line, token.lexeme)]
     UnexpectedToken { token: Token<'a> },
 
@@ -128,6 +131,9 @@ impl<'a> ParserErrorContext {
             }
             ParserErrorContext::ExpectedLeftBraceBeforeFunctionBody => {
                 ParserError::ExpectedLeftBraceBeforeFunctionBody { token }
+            }
+            ParserErrorContext::ExpectedSemicolonAfterReturnValue => {
+                ParserError::ExpectedSemicolonAfterReturnValue { token }
             }
         }
     }

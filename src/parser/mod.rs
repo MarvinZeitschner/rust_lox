@@ -6,7 +6,7 @@ use crate::{
     ast::{
         Expr, ExprAssign, ExprBinary, ExprCall, ExprGrouping, ExprLiteral, ExprLogical, ExprUnary,
         ExprVariable, LiteralValue, Stmt, StmtBlock, StmtExpression, StmtFunction, StmtIf,
-        StmtPrint, StmtVar, StmtWhile,
+        StmtPrint, StmtReturn, StmtVar, StmtWhile,
     },
     lex::{Token, TokenType},
 };
@@ -144,6 +144,9 @@ impl<'a> Parser<'a> {
         if self.tokenstream.match_l(&[TokenType::Print])? {
             return self.print_statement();
         }
+        if self.tokenstream.match_l(&[TokenType::Return])? {
+            return self.return_statement();
+        }
         if self.tokenstream.match_l(&[TokenType::LeftBrace])? {
             return Ok(Stmt::Block(StmtBlock::new(self.block()?)));
         }
@@ -197,6 +200,22 @@ impl<'a> Parser<'a> {
         self.tokenstream
             .consume(&TokenType::Semicolon, ParserErrorContext::ExpectedSemicolon)?;
         Ok(Stmt::Print(StmtPrint::new(value)))
+    }
+
+    fn return_statement(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
+        let keyword = self.tokenstream.previous()?;
+        let mut value = None;
+
+        if !self.tokenstream.check(&TokenType::Semicolon)? {
+            value = Some(self.expression()?);
+        }
+
+        self.tokenstream.consume(
+            &TokenType::Semicolon,
+            ParserErrorContext::ExpectedSemicolonAfterReturnValue,
+        )?;
+
+        Ok(Stmt::Return(StmtReturn::new(keyword, value)))
     }
 
     fn while_statement(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
