@@ -2,6 +2,7 @@ pub mod callable;
 pub mod environment;
 pub mod error;
 pub mod native_fun;
+pub mod resolver;
 pub mod value;
 
 use std::{collections::VecDeque, rc::Rc};
@@ -264,7 +265,6 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
     }
 
     fn visit_function(&mut self, node: &'b StmtFunction<'a>) -> Self::Output {
-        // TODO: Clone
         let function = LoxFunction::new(node, self.get_ptr_environment());
 
         self.get_mut_environment()

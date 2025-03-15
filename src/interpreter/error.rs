@@ -28,8 +28,14 @@ pub enum RuntimeError<'a> {
         given_len: usize,
     },
 
+    #[error("Internal Error: Error while creating environments")]
+    EnvironmentCreationError,
+
     #[error("{0}")]
     CallableError(#[from] CallableError),
+
+    #[error("{0}")]
+    ResolverError(#[from] ResolverError<'static>),
 
     // Not an actual Error, but rather a special type to unwind the interpreter to the call method of LoxCallable when a value is returned
     #[error("Internal Error: Unhandled return")]
@@ -43,6 +49,12 @@ pub enum CallableError {
 
     #[error("Parameter not Found; Internal Error")]
     ParamNotFound,
+}
+
+#[derive(Error, Debug, PartialEq, PartialOrd, Clone)]
+pub enum ResolverError<'a> {
+    #[error("Parameter not Found; Internal Error")]
+    VariableInOwnInitializer { token: Token<'a> },
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
