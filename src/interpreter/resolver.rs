@@ -85,28 +85,36 @@ impl<'a> Resolver<'a> {
 impl<'a, 'b> ExprVisitor<'a, 'b> for Resolver<'a> {
     type Output = Result<(), ResolverError<'a>>;
 
-    fn visit_literal(&mut self, node: &ExprLiteral) -> Self::Output {
-        todo!()
+    fn visit_literal(&mut self, _node: &ExprLiteral) -> Self::Output {
+        Ok(())
     }
 
     fn visit_grouping(&mut self, node: &'b ExprGrouping<'a>) -> Self::Output {
-        todo!()
+        self.resolve_expr(&node.value);
+        Ok(())
     }
 
     fn visit_logical(&mut self, node: &'b ExprLogical<'a>) -> Self::Output {
-        todo!()
+        self.resolve_expr(&node.left);
+        self.resolve_expr(&node.right);
+        Ok(())
     }
 
     fn visit_unary(&mut self, node: &'b ExprUnary<'a>) -> Self::Output {
-        todo!()
+        self.resolve_expr(&node.value);
+        Ok(())
     }
 
     fn visit_binary(&mut self, node: &'b ExprBinary<'a>) -> Self::Output {
-        todo!()
+        self.resolve_expr(&node.left);
+        self.resolve_expr(&node.right);
+        Ok(())
     }
 
     fn visit_call(&mut self, node: &'b ExprCall<'a>) -> Self::Output {
-        todo!()
+        self.resolve_expr(&node.callee);
+        node.arguments.iter().for_each(|arg| self.resolve_expr(arg));
+        Ok(())
     }
 
     fn visit_assign(&mut self, node: &'b ExprAssign<'a>) -> Self::Output {
@@ -145,7 +153,7 @@ impl<'a, 'b> StmtVisitor<'a, 'b> for Resolver<'a> {
     }
 
     fn visit_expression(&mut self, node: &'b StmtExpression<'a>) -> Self::Output {
-        todo!()
+        self.resolve_expr(&node.expr);
     }
 
     fn visit_function(&mut self, node: &'b StmtFunction<'a>) -> Self::Output {
@@ -156,22 +164,33 @@ impl<'a, 'b> StmtVisitor<'a, 'b> for Resolver<'a> {
     }
 
     fn visit_if(&mut self, node: &'b StmtIf<'a>) -> Self::Output {
-        todo!()
+        self.resolve_expr(&node.condition);
+        self.resolve_stmt(&node.then_branch);
+        if let Some(else_branch) = &node.else_branch {
+            self.resolve_stmt(else_branch);
+        }
     }
 
     fn visit_print(&mut self, node: &'b StmtPrint<'a>) -> Self::Output {
-        todo!()
+        self.resolve_expr(&node.expr);
     }
 
     fn visit_return(&mut self, node: &'b StmtReturn<'a>) -> Self::Output {
-        todo!()
+        if let Some(expr) = &node.value {
+            self.resolve_expr(expr);
+        }
     }
 
     fn visit_var(&mut self, node: &'b StmtVar<'a>) -> Self::Output {
-        todo!()
+        self.declare(&node.name);
+        if let Some(expr) = &node.initializer {
+            self.resolve_expr(expr);
+        }
+        self.define(&node.name);
     }
 
     fn visit_while(&mut self, node: &'b StmtWhile<'a>) -> Self::Output {
-        todo!()
+        self.resolve_expr(&node.condition);
+        self.resolve_stmt(&node.body);
     }
 }
