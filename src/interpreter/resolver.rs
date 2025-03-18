@@ -56,13 +56,14 @@ impl<'a, 'b: 'a> Resolver<'a> {
     }
 
     fn declare(&mut self, name: &Token<'a>) -> Result<(), ResolverError<'a>> {
-        let Some(scope) = self.scopes.last_mut() else {
+        if self.scopes.is_empty() {
             return Ok(());
-        };
+        }
+
+        let scope = self.scopes.last_mut().unwrap();
 
         if scope.contains_key(name.lexeme) {
-            panic!("AAAA");
-            // Err(ResolverError::SameNameVariableInLocalScope { token: *name })
+            Err(ResolverError::SameNameVariableInLocalScope { token: *name })
         } else {
             scope.insert(name.lexeme, false);
             Ok(())
@@ -70,9 +71,10 @@ impl<'a, 'b: 'a> Resolver<'a> {
     }
 
     fn define(&mut self, name: &Token<'a>) {
-        let Some(scope) = self.scopes.last_mut() else {
+        if self.scopes.is_empty() {
             return;
-        };
+        }
+        let scope = self.scopes.last_mut().unwrap();
 
         if scope.contains_key(name.lexeme) {
             scope.entry(name.lexeme).and_modify(|v| *v = true);
@@ -82,12 +84,12 @@ impl<'a, 'b: 'a> Resolver<'a> {
     }
 
     fn resolve_local(&mut self, expr: Expr<'a>, name: Token<'a>) {
-        self.scopes.iter().rev().enumerate().for_each(|(i, scope)| {
+        for (i, scope) in self.scopes.iter().enumerate().rev() {
             if scope.contains_key(name.lexeme) {
-                // TODO: clone
                 self.locals.insert(expr.clone(), self.scopes.len() - 1 - i);
+                return;
             }
-        });
+        }
     }
 
     fn resolve_function(
@@ -153,8 +155,7 @@ impl<'a, 'b: 'a> ExprVisitor<'a, 'b> for Resolver<'a> {
 
     fn visit_assign(&mut self, node: &'b ExprAssign<'a>) -> Self::Output {
         self.resolve_expr(&node.value)?;
-        // TODO: clone
-        self.resolve_local(*node.value.clone(), node.name);
+        self.resolve_local(Expr::Assign(node.clone()), node.name);
         Ok(())
     }
 
@@ -169,9 +170,7 @@ impl<'a, 'b: 'a> ExprVisitor<'a, 'b> for Resolver<'a> {
             }
         }
 
-        // TODO: clone
-        let expr = Expr::Variable(node.clone());
-        self.resolve_local(expr, node.name);
+        self.resolve_local(Expr::Variable(node.clone()), node.name);
 
         Ok(())
     }

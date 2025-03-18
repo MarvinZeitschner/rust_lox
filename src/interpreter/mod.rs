@@ -50,6 +50,7 @@ impl<'a, 'b: 'a> Interpreter<'a> {
         unsafe { &mut *self.environment }
     }
 
+    #[allow(dead_code)]
     fn get_environment(&self) -> &Environment<'a> {
         unsafe { &*self.environment }
     }
@@ -256,7 +257,7 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
         match distance {
             Some(d) => {
                 self.get_mut_environment()
-                    .assign_at(d.clone(), node.name, value.clone());
+                    .assign_at(d, node.name, value.clone());
             }
             None => self.globals.assign(node.name, value.clone())?,
         }
