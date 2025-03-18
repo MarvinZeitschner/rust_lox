@@ -29,7 +29,6 @@ impl<'a> Environment<'a> {
     pub fn get(&self, name: Token<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
         match self.values.get(name.lexeme) {
             Some(value) => match value {
-                // TODO:
                 Some(value) => Ok(value.clone()),
                 None => Ok(Value::Nil),
             },

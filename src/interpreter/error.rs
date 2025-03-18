@@ -53,13 +53,13 @@ pub enum CallableError {
 
 #[derive(Error, Debug, PartialEq, PartialOrd, Clone)]
 pub enum ResolverError<'a> {
-    #[error("Can't read local variable in its own initializer.")]
+    #[error("[line {}] Can't read local variable in its own initializer", token.line)]
     VariableInOwnInitializer { token: Token<'a> },
 
     #[error("Internal Error")]
     InternalResolverError,
 
-    #[error("[line {}] Already a varaible with the same name in the scope", token.line)]
+    #[error("[line {}] Already a variable with the same name in the scope", token.line)]
     SameNameVariableInLocalScope { token: Token<'a> },
 
     #[error("[line {}] Cannot return from top-level code", token.line)]

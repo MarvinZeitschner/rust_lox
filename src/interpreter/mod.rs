@@ -266,7 +266,6 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
     }
 
     fn visit_variable(&mut self, node: &ExprVariable<'a>) -> Self::Output {
-        // self.get_environment().get(node.name)
         self.lookup_variable(node.name, &Expr::Variable(node.clone()))
     }
 }
@@ -338,63 +337,68 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
     }
 }
 
-// #[cfg(test)]
-// mod test {
-//     use crate::lex::{Span, Token};
-//
-//     use super::*;
-//
-//     #[test]
-//     fn literal() {
-//         let mut interpreter = Interpreter::new();
-//
-//         let expr = Expr::Literal(ExprLiteral::new(LiteralValue::F64(1.0)));
-//         let result = interpreter.evaluate(&expr).unwrap();
-//
-//         assert_eq!(result, Value::Number(1.0));
-//     }
-//
-//     #[test]
-//     fn grouping() {
-//         let mut interpreter = Interpreter::new();
-//
-//         let expr = Expr::Grouping(ExprGrouping::new(Box::new(Expr::Literal(
-//             ExprLiteral::new(LiteralValue::F64(1.0)),
-//         ))));
-//         let result = interpreter.evaluate(&expr).unwrap();
-//
-//         assert_eq!(result, Value::Number(1.0));
-//     }
-//
-//     #[test]
-//     fn unary() {
-//         let mut interpreter = Interpreter::new();
-//
-//         let span = Span { begin: 0, end: 1 };
-//         let token = Token::new(TokenType::Minus, "-", 1, span);
-//         let expr = Expr::Unary(ExprUnary::new(
-//             token,
-//             Box::new(Expr::Literal(ExprLiteral::new(LiteralValue::F64(1.0)))),
-//         ));
-//         let result = interpreter.evaluate(&expr).unwrap();
-//
-//         assert_eq!(result, Value::Number(-1.0));
-//     }
-//
-//     #[test]
-//     fn error() {
-//         let mut interpreter = Interpreter::new();
-//
-//         let span = Span { begin: 0, end: 1 };
-//         let token = Token::new(TokenType::Minus, "-", 1, span);
-//         let expr = Expr::Unary(ExprUnary::new(
-//             token,
-//             Box::new(Expr::Literal(ExprLiteral::new(LiteralValue::String(
-//                 "1".to_string(),
-//             )))),
-//         ));
-//         let result = interpreter.evaluate(&expr);
-//
-//         assert_eq!(result, Err(RuntimeError::NumberOperand { operator: token }));
-//     }
-// }
+#[cfg(test)]
+mod test {
+    use crate::lex::{Span, Token};
+
+    use super::*;
+
+    fn setup() -> Interpreter<'static> {
+        let locals = HashMap::new();
+        Interpreter::new(locals)
+    }
+
+    #[test]
+    fn literal() {
+        let mut interpreter = setup();
+
+        let expr = Expr::Literal(ExprLiteral::new(LiteralValue::F64(1.0)));
+        let result = interpreter.evaluate(&expr).unwrap();
+
+        assert_eq!(result, Value::Number(1.0));
+    }
+
+    #[test]
+    fn grouping() {
+        let mut interpreter = setup();
+
+        let expr = Expr::Grouping(ExprGrouping::new(Box::new(Expr::Literal(
+            ExprLiteral::new(LiteralValue::F64(1.0)),
+        ))));
+        let result = interpreter.evaluate(&expr).unwrap();
+
+        assert_eq!(result, Value::Number(1.0));
+    }
+
+    #[test]
+    fn unary() {
+        let mut interpreter = setup();
+
+        let span = Span { begin: 0, end: 1 };
+        let token = Token::new(TokenType::Minus, "-", 1, span);
+        let expr = Expr::Unary(ExprUnary::new(
+            token,
+            Box::new(Expr::Literal(ExprLiteral::new(LiteralValue::F64(1.0)))),
+        ));
+        let result = interpreter.evaluate(&expr).unwrap();
+
+        assert_eq!(result, Value::Number(-1.0));
+    }
+
+    #[test]
+    fn error() {
+        let mut interpreter = setup();
+
+        let span = Span { begin: 0, end: 1 };
+        let token = Token::new(TokenType::Minus, "-", 1, span);
+        let expr = Expr::Unary(ExprUnary::new(
+            token,
+            Box::new(Expr::Literal(ExprLiteral::new(LiteralValue::String(
+                "1".to_string(),
+            )))),
+        ));
+        let result = interpreter.evaluate(&expr);
+
+        assert_eq!(result, Err(RuntimeError::NumberOperand { operator: token }));
+    }
+}

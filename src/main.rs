@@ -45,9 +45,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(65);
     }
 
-    // println!("{:#?}", resolver.get_locals());
-    // return Ok(());
-
     let mut interpreter = Interpreter::new(resolver.get_locals());
     let res = interpreter.interpret(&stmts);
 
