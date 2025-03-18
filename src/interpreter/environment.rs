@@ -40,6 +40,28 @@ impl<'a> Environment<'a> {
         }
     }
 
+    pub fn get_at(&mut self, distance: usize, name: &'a str) -> Value<'a> {
+        // The Resolver already found the variable before, so we know it's there
+        self.ancestor(distance)
+            .values
+            .get(name)
+            .unwrap()
+            .clone()
+            .unwrap()
+    }
+
+    pub fn assign_at(&mut self, distance: usize, name: Token<'a>, value: Value<'a>) {
+        self.ancestor(distance).define(name.lexeme, Some(value));
+    }
+
+    fn ancestor(&mut self, distance: usize) -> &mut Environment<'a> {
+        let mut environment = self;
+        for _ in 0..distance {
+            environment = unsafe { &mut (*environment.enclosing.unwrap()) };
+        }
+        environment
+    }
+
     pub fn assign(&mut self, name: Token<'a>, value: Value<'a>) -> Result<(), RuntimeError<'a>> {
         match self.values.contains_key(name.lexeme) {
             true => {

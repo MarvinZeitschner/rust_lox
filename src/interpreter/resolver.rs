@@ -2,33 +2,40 @@ use std::collections::HashMap;
 
 use crate::{ast::*, lex::Token};
 
-use super::{
-    error::{ResolverError, RuntimeError},
-    Interpreter,
-};
+use super::error::ResolverError;
 
+#[derive(Default)]
 pub struct Resolver<'a> {
-    interpreter: Interpreter<'a>,
     scopes: Vec<HashMap<&'a str, bool>>,
+    locals: HashMap<Expr<'a>, usize>,
 }
 
-impl<'a> Resolver<'a> {
-    pub fn new(interpreter: Interpreter<'a>) -> Self {
+impl<'a, 'b: 'a> Resolver<'a> {
+    pub fn new() -> Self {
         Self {
-            interpreter,
             scopes: vec![],
+            locals: HashMap::new(),
         }
     }
 
-    fn resolve_stmt(&mut self, stmt: &Stmt<'a>) {
+    pub fn resolve(&mut self, stmts: &'b [Stmt<'a>]) -> Result<(), ResolverError<'a>> {
+        stmts.iter().for_each(|stmt| self.resolve_stmt(stmt));
+        Ok(())
+    }
+
+    pub fn get_locals(self) -> HashMap<Expr<'a>, usize> {
+        self.locals
+    }
+
+    fn resolve_stmt(&mut self, stmt: &'b Stmt<'a>) {
         stmt.accept(self);
     }
 
-    fn resolve_stmts(&mut self, stmts: &[Stmt<'a>]) {
+    fn resolve_stmts(&mut self, stmts: &'b [Stmt<'a>]) {
         stmts.iter().for_each(|stmt| self.resolve_stmt(stmt));
     }
 
-    fn resolve_expr(&mut self, expr: &Expr<'a>) {
+    fn resolve_expr(&mut self, expr: &'b Expr<'a>) {
         expr.accept(self);
     }
 
@@ -62,16 +69,16 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn resolve_local(&mut self, expr: &Expr<'a>, name: Token<'a>) {
+    fn resolve_local(&mut self, expr: Expr<'a>, name: Token<'a>) {
         self.scopes.iter().rev().enumerate().for_each(|(i, scope)| {
             if scope.contains_key(name.lexeme) {
-                self.interpreter.resolve(expr, i);
-                return;
+                // TODO: clone
+                self.locals.insert(expr.clone(), i);
             }
         });
     }
 
-    fn resolve_function(&mut self, function: &StmtFunction<'a>) {
+    fn resolve_function(&mut self, function: &'b StmtFunction<'a>) {
         self.begin_scope();
         function.params.iter().for_each(|param| {
             self.declare(param);
@@ -82,7 +89,7 @@ impl<'a> Resolver<'a> {
     }
 }
 
-impl<'a, 'b> ExprVisitor<'a, 'b> for Resolver<'a> {
+impl<'a, 'b: 'a> ExprVisitor<'a, 'b> for Resolver<'a> {
     type Output = Result<(), ResolverError<'a>>;
 
     fn visit_literal(&mut self, _node: &ExprLiteral) -> Self::Output {
@@ -119,7 +126,8 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Resolver<'a> {
 
     fn visit_assign(&mut self, node: &'b ExprAssign<'a>) -> Self::Output {
         self.resolve_expr(&node.value);
-        self.resolve_local(&node.value, node.name);
+        // TODO: clone
+        self.resolve_local(*node.value.clone(), node.name);
         Ok(())
     }
 
@@ -137,13 +145,14 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Resolver<'a> {
         }
 
         // TODO: clone
-        self.resolve_local(&Expr::Variable(node.clone()), node.name);
+        let expr = Expr::Variable(node.clone());
+        self.resolve_local(expr, node.name);
 
         Ok(())
     }
 }
 
-impl<'a, 'b> StmtVisitor<'a, 'b> for Resolver<'a> {
+impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
     type Output = ();
 
     fn visit_block(&mut self, node: &'b StmtBlock<'a>) -> Self::Output {
