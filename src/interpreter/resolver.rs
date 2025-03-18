@@ -57,33 +57,35 @@ impl<'a, 'b: 'a> Resolver<'a> {
 
     fn declare(&mut self, name: &Token<'a>) -> Result<(), ResolverError<'a>> {
         let Some(scope) = self.scopes.last_mut() else {
-            return Err(ResolverError::InternalResolverError);
+            return Ok(());
         };
 
         if scope.contains_key(name.lexeme) {
-            Err(ResolverError::SameNameVariableInLocalScope { token: *name })
+            panic!("AAAA");
+            // Err(ResolverError::SameNameVariableInLocalScope { token: *name })
         } else {
             scope.insert(name.lexeme, false);
             Ok(())
         }
     }
 
-    fn define(&mut self, name: &Token<'a>) -> Result<(), ResolverError<'a>> {
+    fn define(&mut self, name: &Token<'a>) {
         let Some(scope) = self.scopes.last_mut() else {
-            return Err(ResolverError::InternalResolverError);
+            return;
         };
 
         if scope.contains_key(name.lexeme) {
             scope.entry(name.lexeme).and_modify(|v| *v = true);
+        } else {
+            scope.insert(name.lexeme, true);
         }
-        Ok(())
     }
 
     fn resolve_local(&mut self, expr: Expr<'a>, name: Token<'a>) {
         self.scopes.iter().rev().enumerate().for_each(|(i, scope)| {
             if scope.contains_key(name.lexeme) {
                 // TODO: clone
-                self.locals.insert(expr.clone(), i);
+                self.locals.insert(expr.clone(), self.scopes.len() - 1 - i);
             }
         });
     }
@@ -102,7 +104,7 @@ impl<'a, 'b: 'a> Resolver<'a> {
             .iter()
             .try_for_each(|param| -> Result<(), ResolverError<'a>> {
                 self.declare(param)?;
-                self.define(param)?;
+                self.define(param);
                 Ok(())
             })?;
         self.resolve_stmts(&function.body)?;
@@ -157,16 +159,14 @@ impl<'a, 'b: 'a> ExprVisitor<'a, 'b> for Resolver<'a> {
     }
 
     fn visit_variable(&mut self, node: &'b ExprVariable<'a>) -> Self::Output {
-        let Some(scope) = self.scopes.last_mut() else {
-            return Err(ResolverError::VariableInOwnInitializer { token: node.name });
-        };
+        if !self.scopes.is_empty() {
+            let scope = self.scopes.last().unwrap();
 
-        let Some(var) = scope.get(node.name.lexeme) else {
-            return Err(ResolverError::VariableInOwnInitializer { token: node.name });
-        };
-
-        if !(*var) {
-            return Err(ResolverError::VariableInOwnInitializer { token: node.name });
+            if let Some(var) = scope.get(node.name.lexeme) {
+                if !(*var) {
+                    return Err(ResolverError::VariableInOwnInitializer { token: node.name });
+                }
+            }
         }
 
         // TODO: clone
@@ -193,7 +193,7 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
 
     fn visit_function(&mut self, node: &'b StmtFunction<'a>) -> Self::Output {
         self.declare(&node.name)?;
-        self.define(&node.name)?;
+        self.define(&node.name);
 
         self.resolve_function(node, FunctionType::Function)?;
         Ok(())
@@ -230,7 +230,7 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
         if let Some(expr) = &node.initializer {
             self.resolve_expr(expr)?;
         }
-        self.define(&node.name)?;
+        self.define(&node.name);
         Ok(())
     }
 

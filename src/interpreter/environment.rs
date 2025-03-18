@@ -45,9 +45,9 @@ impl<'a> Environment<'a> {
         self.ancestor(distance)
             .values
             .get(name)
-            .unwrap()
+            .expect("AAAA")
             .clone()
-            .unwrap()
+            .expect("BBBB")
     }
 
     pub fn assign_at(&mut self, distance: usize, name: Token<'a>, value: Value<'a>) {

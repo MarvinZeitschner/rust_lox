@@ -53,7 +53,7 @@ pub enum CallableError {
 
 #[derive(Error, Debug, PartialEq, PartialOrd, Clone)]
 pub enum ResolverError<'a> {
-    #[error("Parameter not Found; Internal Error")]
+    #[error("Can't read local variable in its own initializer.")]
     VariableInOwnInitializer { token: Token<'a> },
 
     #[error("Internal Error")]
