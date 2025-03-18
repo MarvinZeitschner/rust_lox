@@ -1,4 +1,5 @@
 use core::fmt;
+use std::hash::{Hash, Hasher};
 
 use error::TokenError;
 
@@ -55,13 +56,24 @@ pub enum TokenType {
     EOF,
 }
 
-#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
+impl Hash for TokenType {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+        if let TokenType::Number(n) = self {
+            n.to_bits().hash(state);
+        }
+    }
+}
+
+impl Eq for TokenType {}
+
+#[derive(Debug, PartialEq, PartialOrd, Clone, Copy, Eq, Hash)]
 pub struct Span {
     pub begin: u32,
     pub end: u32,
 }
 
-#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
+#[derive(Debug, PartialEq, PartialOrd, Clone, Copy, Eq, Hash)]
 pub struct Token<'a> {
     pub kind: TokenType,
     pub lexeme: &'a str,

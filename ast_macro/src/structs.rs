@@ -44,7 +44,7 @@ pub fn struct_defs(
     let lt = internal_lifetime.borrow().clone();
 
     quote! {
-        #[derive(Debug, PartialEq, Clone)]
+        #[derive(Debug, PartialEq, Clone, Eq, Hash)]
         pub struct #name #lt {
             #(#struct_fields),*
         }

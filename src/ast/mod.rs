@@ -1,5 +1,8 @@
 pub mod printer;
 
+use std::hash::Hash;
+use std::hash::Hasher;
+
 use ast_macro::Ast;
 
 use crate::lex::Token;
@@ -11,6 +14,17 @@ pub enum LiteralValue {
     Bool(bool),
     Nil,
 }
+
+impl Hash for LiteralValue {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+        if let LiteralValue::F64(n) = self {
+            n.to_bits().hash(state);
+        }
+    }
+}
+
+impl Eq for LiteralValue {}
 
 #[derive(Ast, Debug, PartialEq)]
 #[name = "Expr"]

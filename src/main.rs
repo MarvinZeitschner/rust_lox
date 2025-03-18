@@ -1,6 +1,6 @@
 use clap::Parser;
 use rust_lox::{
-    interpreter::Interpreter,
+    interpreter::{resolver::Resolver, Interpreter},
     lex::Scanner,
     parser::{self, TokenStream},
 };
@@ -39,8 +39,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    // return Ok(());
-    let mut interpreter = Interpreter::new();
+    let mut resolver = Resolver::new();
+    if let Err(e) = resolver.resolve(&stmts) {
+        eprintln!("{e:#}");
+        std::process::exit(65);
+    }
+
+    let mut interpreter = Interpreter::new(resolver.get_locals());
     let res = interpreter.interpret(&stmts);
 
     match res {
