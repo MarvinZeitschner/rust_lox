@@ -55,6 +55,15 @@ pub enum CallableError {
 pub enum ResolverError<'a> {
     #[error("Parameter not Found; Internal Error")]
     VariableInOwnInitializer { token: Token<'a> },
+
+    #[error("Internal Error")]
+    InternalResolverError,
+
+    #[error("[line {}] Already a varaible with the same name in the scope", token.line)]
+    SameNameVariableInLocalScope { token: Token<'a> },
+
+    #[error("[line {}] Cannot return from top-level code", token.line)]
+    TopLevelReturn { token: Token<'a> },
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]

@@ -67,11 +67,6 @@ impl<'a, 'b: 'a> Interpreter<'a> {
         stmt.accept(self)
     }
 
-    fn resolve(&mut self, expr: Expr<'a>, depth: usize) -> Result<(), RuntimeError<'a>> {
-        self.locals.insert(expr, depth);
-        Ok(())
-    }
-
     fn execute_block(
         &mut self,
         statements: &'b [Stmt<'a>],
