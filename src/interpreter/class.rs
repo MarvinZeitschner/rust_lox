@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt};
+use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
 use crate::lex::Token;
 
@@ -27,7 +27,7 @@ impl<'a> LoxCallable<'a> for LoxClass<'a> {
     ) -> Result<super::value::Value<'a>, super::error::RuntimeError<'a>> {
         // TODO: Clone
         let instance = LoxInstance::new(self.clone());
-        Ok(Value::Instance(instance))
+        Ok(Value::Instance(Rc::new(RefCell::new(instance))))
     }
 
     fn arity(&self) -> usize {

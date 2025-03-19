@@ -1,4 +1,5 @@
 use std::{
+    cell::RefCell,
     fmt::{self},
     rc::Rc,
 };
@@ -14,7 +15,7 @@ pub enum Value<'a> {
     String(String),
     Boolean(bool),
     Callable(Rc<dyn LoxCallable<'a>>),
-    Instance(LoxInstance<'a>),
+    Instance(Rc<RefCell<LoxInstance<'a>>>),
     Nil,
 }
 
@@ -151,7 +152,7 @@ impl<'a> fmt::Display for Value<'a> {
             Value::Boolean(b) => write!(f, "{}", b),
             Value::Callable(lox_callable) => write!(f, "{:?}", lox_callable),
             Value::Nil => write!(f, "nil"),
-            Value::Instance(lox_instance) => write!(f, "{:?}", lox_instance),
+            Value::Instance(lox_instance) => write!(f, "{:?}", lox_instance.borrow()),
         }
     }
 }

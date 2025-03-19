@@ -167,7 +167,7 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
     fn visit_set(&mut self, node: &'b ExprSet<'a>) -> Self::Output {
         let object = self.evaluate(&node.object)?;
 
-        let Value::Instance(mut instance) = object else {
+        let Value::Instance(instance) = object else {
             return Err(RuntimeError::ClassError(
                 ClassError::InvalidPropertyAccess { token: node.name },
             ));
@@ -175,7 +175,7 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
 
         let value = self.evaluate(&node.value)?;
         // TODO: Clone
-        instance.set(node.name, value.clone());
+        instance.borrow_mut().set(node.name, value.clone());
         Ok(value)
     }
 
@@ -270,7 +270,7 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
         let object = self.evaluate(&node.object)?;
 
         if let Value::Instance(instance) = object {
-            return instance.get(node.name);
+            return instance.borrow().get(node.name);
         }
 
         Err(RuntimeError::ClassError(
@@ -281,7 +281,6 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
     fn visit_assign(&mut self, node: &ExprAssign<'a>) -> Self::Output {
         let value = self.evaluate(&node.value)?;
 
-        // TODO: Clone
         let distance = self.locals.get(&Expr::Assign(node.clone())).cloned();
         match distance {
             Some(d) => {
