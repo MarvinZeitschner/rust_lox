@@ -54,6 +54,10 @@ pub enum Expression<'a> {
         paren: Token<'a>,
         arguments: Vec<Expr<'a>>,
     },
+    Get {
+        object: Box<Expr<'a>>,
+        name: Token<'a>,
+    },
     Assign {
         name: Token<'a>,
         value: Box<Expr<'a>>,

@@ -13,7 +13,7 @@ impl AstPrinter {
     }
 }
 
-impl ExprVisitor<'_, '_> for AstPrinter {
+impl<'a> ExprVisitor<'_, 'a> for AstPrinter {
     type Output = String;
 
     fn visit_literal(&mut self, node: &ExprLiteral) -> Self::Output {
@@ -50,6 +50,10 @@ impl ExprVisitor<'_, '_> for AstPrinter {
     }
 
     fn visit_variable(&mut self, _node: &ExprVariable) -> Self::Output {
+        todo!()
+    }
+
+    fn visit_get(&mut self, _node: &ExprGet<'a>) -> Self::Output {
         todo!()
     }
 }

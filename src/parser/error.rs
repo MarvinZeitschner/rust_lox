@@ -85,6 +85,9 @@ pub enum ParserError<'a> {
     #[error("[line {}] Expected }} after class body", token.line)]
     ExpectedRightBraceAfterClassBody { token: Token<'a> },
 
+    #[error("[line {}] Expected property name after '.'", token.line)]
+    ExpectedPropertyNameAfterDot { token: Token<'a> },
+
     #[error("{0}")]
     TokenStream(#[from] TokenStreamError),
 }
@@ -154,6 +157,9 @@ impl<'a> ParserErrorContext {
             }
             ParserErrorContext::ExpectedLeftBraceBeforeClassBody => {
                 ParserError::ExpectedLeftBraceBeforeClassBody { token }
+            }
+            ParserErrorContext::ExpectedPropertyNameAfterDot => {
+                ParserError::ExpectedPropertyNameAfterDot { token }
             }
         }
     }

@@ -4,9 +4,9 @@ use error::{ParserError, ParserErrorContext, TokenStreamError};
 
 use crate::{
     ast::{
-        Expr, ExprAssign, ExprBinary, ExprCall, ExprGrouping, ExprLiteral, ExprLogical, ExprUnary,
-        ExprVariable, LiteralValue, Stmt, StmtBlock, StmtClass, StmtExpression, StmtFunction,
-        StmtIf, StmtPrint, StmtReturn, StmtVar, StmtWhile,
+        Expr, ExprAssign, ExprBinary, ExprCall, ExprGet, ExprGrouping, ExprLiteral, ExprLogical,
+        ExprUnary, ExprVariable, LiteralValue, Stmt, StmtBlock, StmtClass, StmtExpression,
+        StmtFunction, StmtIf, StmtPrint, StmtReturn, StmtVar, StmtWhile,
     },
     lex::{Token, TokenType},
 };
@@ -384,6 +384,12 @@ impl<'a> Parser<'a> {
         loop {
             if self.tokenstream.match_l(&[TokenType::LeftParen])? {
                 expr = self.finish_call(expr)?;
+            } else if self.tokenstream.match_l(&[TokenType::Dot])? {
+                let name = self.tokenstream.consume(
+                    &TokenType::Ident,
+                    ParserErrorContext::ExpectedPropertyNameAfterDot,
+                )?;
+                expr = Expr::Get(ExprGet::new(Box::new(expr), name));
             } else {
                 break;
             }
