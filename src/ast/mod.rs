@@ -69,6 +69,10 @@ pub enum Statement<'a> {
     Block {
         statements: Vec<Stmt<'a>>,
     },
+    Class {
+        name: Token<'a>,
+        methods: Vec<StmtFunction<'a>>,
+    },
     Expression {
         expr: Expr<'a>,
     },

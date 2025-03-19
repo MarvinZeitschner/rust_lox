@@ -5,8 +5,8 @@ use error::{ParserError, ParserErrorContext, TokenStreamError};
 use crate::{
     ast::{
         Expr, ExprAssign, ExprBinary, ExprCall, ExprGrouping, ExprLiteral, ExprLogical, ExprUnary,
-        ExprVariable, LiteralValue, Stmt, StmtBlock, StmtExpression, StmtFunction, StmtIf,
-        StmtPrint, StmtReturn, StmtVar, StmtWhile,
+        ExprVariable, LiteralValue, Stmt, StmtBlock, StmtClass, StmtExpression, StmtFunction,
+        StmtIf, StmtPrint, StmtReturn, StmtVar, StmtWhile,
     },
     lex::{Token, TokenType},
 };
@@ -116,11 +116,42 @@ impl<'a> Parser<'a> {
             return self.try_with_sync(|s| s.var_declaration());
         }
 
+        if self.tokenstream.match_l(&[TokenType::Class])? {
+            return self.try_with_sync(|s| s.class_declaration());
+        }
+
         if self.tokenstream.match_l(&[TokenType::Fun])? {
             return self.try_with_sync(|s| s.function(ParserErrorContext::ExpectedFunctionName));
         }
 
         self.statement()
+    }
+
+    fn class_declaration(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
+        let name = self
+            .tokenstream
+            .consume(&TokenType::Ident, ParserErrorContext::ExpectedClassName)?;
+        self.tokenstream.consume(
+            &TokenType::LeftBrace,
+            ParserErrorContext::ExpectedLeftBraceBeforeClassBody,
+        )?;
+
+        let mut methods = vec![];
+
+        while !self.tokenstream.check(&TokenType::RightBrace)? && !self.tokenstream.is_at_end() {
+            let Stmt::Function(fun) = self.function(ParserErrorContext::ExpectedMethod)? else {
+                // TODO: Handle errror
+                panic!("not a function");
+            };
+
+            methods.push(fun);
+        }
+        self.tokenstream.consume(
+            &TokenType::RightBrace,
+            ParserErrorContext::ExpectedRightBraceAfterClassBody,
+        )?;
+
+        Ok(Stmt::Class(StmtClass::new(name, methods)))
     }
 
     fn var_declaration(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
