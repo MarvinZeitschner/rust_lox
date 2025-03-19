@@ -33,6 +33,10 @@ impl<'a> ExprVisitor<'_, 'a> for AstPrinter {
         todo!()
     }
 
+    fn visit_set(&mut self, _node: &ExprSet<'a>) -> Self::Output {
+        todo!()
+    }
+
     fn visit_unary(&mut self, node: &ExprUnary) -> Self::Output {
         self.parenthesize(node.operator.lexeme, &[&node.value])
     }
@@ -45,15 +49,15 @@ impl<'a> ExprVisitor<'_, 'a> for AstPrinter {
         todo!()
     }
 
+    fn visit_get(&mut self, _node: &ExprGet<'a>) -> Self::Output {
+        todo!()
+    }
+
     fn visit_assign(&mut self, _node: &ExprAssign) -> Self::Output {
         todo!()
     }
 
     fn visit_variable(&mut self, _node: &ExprVariable) -> Self::Output {
-        todo!()
-    }
-
-    fn visit_get(&mut self, _node: &ExprGet<'a>) -> Self::Output {
         todo!()
     }
 }

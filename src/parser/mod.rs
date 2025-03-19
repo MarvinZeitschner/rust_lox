@@ -5,7 +5,7 @@ use error::{ParserError, ParserErrorContext, TokenStreamError};
 use crate::{
     ast::{
         Expr, ExprAssign, ExprBinary, ExprCall, ExprGet, ExprGrouping, ExprLiteral, ExprLogical,
-        ExprUnary, ExprVariable, LiteralValue, Stmt, StmtBlock, StmtClass, StmtExpression,
+        ExprSet, ExprUnary, ExprVariable, LiteralValue, Stmt, StmtBlock, StmtClass, StmtExpression,
         StmtFunction, StmtIf, StmtPrint, StmtReturn, StmtVar, StmtWhile,
     },
     lex::{Token, TokenType},
@@ -443,6 +443,12 @@ impl<'a> Parser<'a> {
             if let Expr::Variable(var) = &expr {
                 let name = var.name;
                 return Ok(Expr::Assign(ExprAssign::new(name, Box::new(value))));
+            } else if let Expr::Get(get) = expr {
+                return Ok(Expr::Set(ExprSet::new(
+                    get.object,
+                    get.name,
+                    Box::new(value),
+                )));
             }
 
             return Err(ParserError::InvalidAssignmentTarget { token: equals });

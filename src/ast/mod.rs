@@ -40,6 +40,11 @@ pub enum Expression<'a> {
         operator: Token<'a>,
         right: Box<Expr<'a>>,
     },
+    Set {
+        object: Box<Expr<'a>>,
+        name: Token<'a>,
+        value: Box<Expr<'a>>,
+    },
     Unary {
         operator: Token<'a>,
         value: Box<Expr<'a>>,

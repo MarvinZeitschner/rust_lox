@@ -53,14 +53,22 @@ impl<'a> LoxInstance<'a> {
         }
     }
 
-    pub fn get(&mut self, name: Token<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
+    pub fn get(&self, name: Token<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
         // TODO: Clone
         self.fields
-            .get_mut(name.lexeme)
+            .get(name.lexeme)
             .ok_or(RuntimeError::ClassError(ClassError::UndefinedProperty {
                 token: name,
             }))
             .cloned()
+    }
+
+    pub fn set(&mut self, name: Token<'a>, value: Value<'a>) {
+        if self.fields.contains_key(name.lexeme) {
+            self.fields.entry(name.lexeme).and_modify(|v| *v = value);
+        } else {
+            self.fields.insert(name.lexeme, value);
+        }
     }
 }
 

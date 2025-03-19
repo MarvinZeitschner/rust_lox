@@ -135,6 +135,12 @@ impl<'a, 'b: 'a> ExprVisitor<'a, 'b> for Resolver<'a> {
         Ok(())
     }
 
+    fn visit_set(&mut self, node: &'b ExprSet<'a>) -> Self::Output {
+        self.resolve_expr(&node.value)?;
+        self.resolve_expr(&node.object)?;
+        Ok(())
+    }
+
     fn visit_unary(&mut self, node: &'b ExprUnary<'a>) -> Self::Output {
         self.resolve_expr(&node.value)?;
         Ok(())
@@ -154,7 +160,7 @@ impl<'a, 'b: 'a> ExprVisitor<'a, 'b> for Resolver<'a> {
     }
 
     fn visit_get(&mut self, node: &'b ExprGet<'a>) -> Self::Output {
-        self.resolve_expr(&node.object);
+        self.resolve_expr(&node.object)?;
         Ok(())
     }
 

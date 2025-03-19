@@ -164,6 +164,21 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
         self.evaluate(&node.right)
     }
 
+    fn visit_set(&mut self, node: &'b ExprSet<'a>) -> Self::Output {
+        let object = self.evaluate(&node.object)?;
+
+        let Value::Instance(mut instance) = object else {
+            return Err(RuntimeError::ClassError(
+                ClassError::InvalidPropertyAccess { token: node.name },
+            ));
+        };
+
+        let value = self.evaluate(&node.value)?;
+        // TODO: Clone
+        instance.set(node.name, value.clone());
+        Ok(value)
+    }
+
     fn visit_unary(&mut self, node: &ExprUnary<'a>) -> Self::Output {
         let operator = node.operator;
         let right = self.evaluate(&node.value)?;
@@ -254,7 +269,7 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
     fn visit_get(&mut self, node: &'b ExprGet<'a>) -> Self::Output {
         let object = self.evaluate(&node.object)?;
 
-        if let Value::Instance(mut instance) = object {
+        if let Value::Instance(instance) = object {
             return instance.get(node.name);
         }
 
