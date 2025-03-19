@@ -5,7 +5,7 @@ use std::{
 
 use crate::ast::LiteralValue;
 
-use super::callable::LoxCallable;
+use super::{callable::LoxCallable, class::LoxClass};
 use std::ops::{Add, Div, Mul, Neg, Not, Sub};
 
 #[derive(Debug, Clone)]
@@ -14,6 +14,7 @@ pub enum Value<'a> {
     String(String),
     Boolean(bool),
     Callable(Rc<dyn LoxCallable<'a>>),
+    Class(LoxClass<'a>),
     Nil,
 }
 
@@ -25,6 +26,8 @@ impl<'a> Value<'a> {
             Value::Boolean(b) => *b,
             Value::Callable(_) => true,
             Value::Nil => false,
+            // TODO: Check
+            Value::Class(_) => true,
         }
     }
 }
@@ -56,6 +59,7 @@ impl<'a> Not for Value<'a> {
             Value::String(_) => Value::Boolean(false),
             Value::Callable(_) => Value::Boolean(false),
             Value::Nil => Value::Boolean(true),
+            Value::Class(_) => Value::Boolean(false),
         }
     }
 }
@@ -148,6 +152,7 @@ impl<'a> fmt::Display for Value<'a> {
             Value::Boolean(b) => write!(f, "{}", b),
             Value::Callable(lox_callable) => write!(f, "{:?}", lox_callable),
             Value::Nil => write!(f, "nil"),
+            Value::Class(lox_class) => write!(f, "{:?}", lox_class.to_string()),
         }
     }
 }

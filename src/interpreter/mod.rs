@@ -1,4 +1,5 @@
 pub mod callable;
+pub mod class;
 pub mod environment;
 pub mod error;
 pub mod native_fun;
@@ -11,6 +12,7 @@ use std::{
 };
 
 use callable::LoxFunction;
+use class::LoxClass;
 use environment::Environment;
 use error::{Return, RuntimeError};
 use native_fun::clock::Clock;
@@ -275,6 +277,14 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
 
     fn visit_block(&mut self, node: &'b StmtBlock<'a>) -> Self::Output {
         self.execute_block(&node.statements, Environment::new(Some(self.environment)))?;
+        Ok(())
+    }
+
+    fn visit_class(&mut self, node: &'b StmtClass<'a>) -> Self::Output {
+        let env = self.get_mut_environment();
+        env.define(&node.name.lexeme, None);
+        let class = LoxClass::new(node.name.lexeme);
+        env.assign(node.name, Value::Class(class))?;
         Ok(())
     }
 

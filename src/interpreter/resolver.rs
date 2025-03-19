@@ -186,6 +186,12 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
         Ok(())
     }
 
+    fn visit_class(&mut self, node: &'b StmtClass<'a>) -> Self::Output {
+        self.declare(&node.name)?;
+        self.define(&node.name);
+        Ok(())
+    }
+
     fn visit_expression(&mut self, node: &'b StmtExpression<'a>) -> Self::Output {
         self.resolve_expr(&node.expr)
     }
