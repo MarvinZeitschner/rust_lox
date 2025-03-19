@@ -307,10 +307,20 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
     }
 
     fn visit_class(&mut self, node: &'b StmtClass<'a>) -> Self::Output {
-        let env = self.get_mut_environment();
-        env.define(node.name.lexeme, None);
-        let class = LoxClass::new(node.name.lexeme);
-        env.assign(node.name, Value::Callable(Rc::new(class)))?;
+        {
+            self.get_mut_environment().define(node.name.lexeme, None);
+        }
+
+        let mut methods = HashMap::new();
+        node.methods.iter().for_each(|method| {
+            let function = LoxFunction::new(method, self.get_ptr_environment());
+            methods.insert(method.name.lexeme, function);
+        });
+
+        let class = LoxClass::new(node.name.lexeme, methods);
+        self.get_mut_environment()
+            .assign(node.name, Value::Callable(Rc::new(class)))?;
+
         Ok(())
     }
 

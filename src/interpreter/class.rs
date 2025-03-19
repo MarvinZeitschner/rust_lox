@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 use crate::lex::Token;
 
 use super::{
-    callable::LoxCallable,
+    callable::{LoxCallable, LoxFunction},
     error::{ClassError, RuntimeError},
     value::Value,
 };
@@ -11,19 +11,24 @@ use super::{
 #[derive(Debug, Clone)]
 pub struct LoxClass<'a> {
     pub name: &'a str,
+    pub methods: HashMap<&'a str, LoxFunction<'a>>,
 }
 
 impl<'a> LoxClass<'a> {
-    pub fn new(name: &'a str) -> Self {
-        Self { name }
+    pub fn new(name: &'a str, methods: HashMap<&'a str, LoxFunction<'a>>) -> Self {
+        Self { name, methods }
+    }
+
+    pub fn find_method(&self, name: &str) -> Option<&LoxFunction<'a>> {
+        self.methods.get(name)
     }
 }
 
 impl<'a> LoxCallable<'a> for LoxClass<'a> {
     fn call(
         &self,
-        interpreter: &mut super::Interpreter<'a>,
-        arguments: std::collections::VecDeque<super::value::Value<'a>>,
+        _interpreter: &mut super::Interpreter<'a>,
+        _arguments: std::collections::VecDeque<super::value::Value<'a>>,
     ) -> Result<super::value::Value<'a>, super::error::RuntimeError<'a>> {
         // TODO: Clone
         let instance = LoxInstance::new(self.clone());
@@ -54,13 +59,19 @@ impl<'a> LoxInstance<'a> {
     }
 
     pub fn get(&self, name: Token<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
-        // TODO: Clone
-        self.fields
-            .get(name.lexeme)
-            .ok_or(RuntimeError::ClassError(ClassError::UndefinedProperty {
-                token: name,
-            }))
-            .cloned()
+        if let Some(value) = self.fields.get(name.lexeme) {
+            // TODO: Clone
+            return Ok(value.clone());
+        }
+
+        let method = self.class.find_method(name.lexeme);
+        if let Some(method) = method {
+            return Ok(Value::Callable(Rc::new(method.clone())));
+        }
+
+        Err(RuntimeError::ClassError(ClassError::UndefinedProperty {
+            token: name,
+        }))
     }
 
     pub fn set(&mut self, name: Token<'a>, value: Value<'a>) {

@@ -5,10 +5,11 @@ use crate::{ast::*, lex::Token};
 use super::error::ResolverError;
 
 #[derive(Default, Copy, Clone, PartialEq)]
-enum FunctionType {
+pub enum FunctionType {
     #[default]
     None,
     Function,
+    Method,
 }
 
 #[derive(Default)]
@@ -200,6 +201,11 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
     fn visit_class(&mut self, node: &'b StmtClass<'a>) -> Self::Output {
         self.declare(&node.name)?;
         self.define(&node.name);
+
+        node.methods
+            .iter()
+            .try_for_each(|fun| self.resolve_function(fun, FunctionType::Method))?;
+
         Ok(())
     }
 

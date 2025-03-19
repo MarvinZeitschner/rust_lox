@@ -26,12 +26,12 @@ impl<'a> fmt::Debug for dyn LoxCallable<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct LoxFunction<'a, 'b> {
-    pub declaration: &'a StmtFunction<'b>,
-    pub closure: *mut Environment<'b>,
+pub struct LoxFunction<'a> {
+    pub declaration: &'a StmtFunction<'a>,
+    pub closure: *mut Environment<'a>,
 }
 
-impl<'a: 'b, 'b> LoxFunction<'a, 'b> {
+impl<'a: 'b, 'b> LoxFunction<'a> {
     pub fn new(declaration: &'a StmtFunction<'b>, closure: *mut Environment<'a>) -> Self {
         Self {
             declaration,
@@ -40,7 +40,7 @@ impl<'a: 'b, 'b> LoxFunction<'a, 'b> {
     }
 }
 
-impl<'a: 'b, 'b> LoxCallable<'a> for LoxFunction<'a, 'b> {
+impl<'a: 'b, 'b> LoxCallable<'a> for LoxFunction<'a> {
     fn call(
         &self,
         interpreter: &mut Interpreter<'a>,
