@@ -1,6 +1,12 @@
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
-use super::{callable::LoxCallable, value::Value};
+use crate::lex::Token;
+
+use super::{
+    callable::LoxCallable,
+    error::{ClassError, RuntimeError},
+    value::Value,
+};
 
 #[derive(Debug, Clone)]
 pub struct LoxClass<'a> {
@@ -36,11 +42,25 @@ impl<'a> LoxCallable<'a> for LoxClass<'a> {
 #[derive(Clone)]
 pub struct LoxInstance<'a> {
     pub class: LoxClass<'a>,
+    pub fields: HashMap<&'a str, Value<'a>>,
 }
 
 impl<'a> LoxInstance<'a> {
     pub fn new(class: LoxClass<'a>) -> Self {
-        Self { class }
+        Self {
+            class,
+            fields: HashMap::new(),
+        }
+    }
+
+    pub fn get(&mut self, name: Token<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
+        // TODO: Clone
+        self.fields
+            .get_mut(name.lexeme)
+            .ok_or(RuntimeError::ClassError(ClassError::UndefinedProperty {
+                token: name,
+            }))
+            .cloned()
     }
 }
 

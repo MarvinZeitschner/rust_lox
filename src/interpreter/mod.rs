@@ -14,7 +14,7 @@ use std::{
 use callable::LoxFunction;
 use class::LoxClass;
 use environment::Environment;
-use error::{Return, RuntimeError};
+use error::{ClassError, Return, RuntimeError};
 use native_fun::clock::Clock;
 use value::Value;
 
@@ -251,6 +251,18 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
         function.call(self, arguments)
     }
 
+    fn visit_get(&mut self, node: &'b ExprGet<'a>) -> Self::Output {
+        let object = self.evaluate(&node.object)?;
+
+        if let Value::Instance(mut instance) = object {
+            return instance.get(node.name);
+        }
+
+        Err(RuntimeError::ClassError(
+            ClassError::InvalidPropertyAccess { token: node.name },
+        ))
+    }
+
     fn visit_assign(&mut self, node: &ExprAssign<'a>) -> Self::Output {
         let value = self.evaluate(&node.value)?;
 
@@ -282,7 +294,7 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
 
     fn visit_class(&mut self, node: &'b StmtClass<'a>) -> Self::Output {
         let env = self.get_mut_environment();
-        env.define(&node.name.lexeme, None);
+        env.define(node.name.lexeme, None);
         let class = LoxClass::new(node.name.lexeme);
         env.assign(node.name, Value::Callable(Rc::new(class)))?;
         Ok(())

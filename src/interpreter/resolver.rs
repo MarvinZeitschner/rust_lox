@@ -153,6 +153,11 @@ impl<'a, 'b: 'a> ExprVisitor<'a, 'b> for Resolver<'a> {
             .try_for_each(|arg| self.resolve_expr(arg))
     }
 
+    fn visit_get(&mut self, node: &'b ExprGet<'a>) -> Self::Output {
+        self.resolve_expr(&node.object);
+        Ok(())
+    }
+
     fn visit_assign(&mut self, node: &'b ExprAssign<'a>) -> Self::Output {
         self.resolve_expr(&node.value)?;
         self.resolve_local(Expr::Assign(node.clone()), node.name);
