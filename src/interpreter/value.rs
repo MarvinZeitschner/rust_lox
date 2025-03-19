@@ -1,11 +1,12 @@
 use std::{
+    cell::RefCell,
     fmt::{self},
     rc::Rc,
 };
 
 use crate::ast::LiteralValue;
 
-use super::callable::LoxCallable;
+use super::{callable::LoxCallable, class::LoxInstance};
 use std::ops::{Add, Div, Mul, Neg, Not, Sub};
 
 #[derive(Debug, Clone)]
@@ -14,6 +15,7 @@ pub enum Value<'a> {
     String(String),
     Boolean(bool),
     Callable(Rc<dyn LoxCallable<'a>>),
+    Instance(Rc<RefCell<LoxInstance<'a>>>),
     Nil,
 }
 
@@ -25,6 +27,7 @@ impl<'a> Value<'a> {
             Value::Boolean(b) => *b,
             Value::Callable(_) => true,
             Value::Nil => false,
+            Value::Instance(_) => true,
         }
     }
 }
@@ -56,6 +59,7 @@ impl<'a> Not for Value<'a> {
             Value::String(_) => Value::Boolean(false),
             Value::Callable(_) => Value::Boolean(false),
             Value::Nil => Value::Boolean(true),
+            Value::Instance(_) => Value::Boolean(false),
         }
     }
 }
@@ -148,6 +152,7 @@ impl<'a> fmt::Display for Value<'a> {
             Value::Boolean(b) => write!(f, "{}", b),
             Value::Callable(lox_callable) => write!(f, "{:?}", lox_callable),
             Value::Nil => write!(f, "nil"),
+            Value::Instance(lox_instance) => write!(f, "{:?}", lox_instance.borrow()),
         }
     }
 }

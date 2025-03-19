@@ -1,4 +1,5 @@
 pub mod callable;
+pub mod class;
 pub mod environment;
 pub mod error;
 pub mod native_fun;
@@ -11,8 +12,9 @@ use std::{
 };
 
 use callable::LoxFunction;
+use class::LoxClass;
 use environment::Environment;
-use error::{Return, RuntimeError};
+use error::{ClassError, Return, RuntimeError};
 use native_fun::clock::Clock;
 use value::Value;
 
@@ -162,6 +164,21 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
         self.evaluate(&node.right)
     }
 
+    fn visit_set(&mut self, node: &'b ExprSet<'a>) -> Self::Output {
+        let object = self.evaluate(&node.object)?;
+
+        let Value::Instance(instance) = object else {
+            return Err(RuntimeError::ClassError(
+                ClassError::InvalidPropertyAccess { token: node.name },
+            ));
+        };
+
+        let value = self.evaluate(&node.value)?;
+        // TODO: Clone
+        instance.borrow_mut().set(node.name, value.clone());
+        Ok(value)
+    }
+
     fn visit_unary(&mut self, node: &ExprUnary<'a>) -> Self::Output {
         let operator = node.operator;
         let right = self.evaluate(&node.value)?;
@@ -249,10 +266,21 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
         function.call(self, arguments)
     }
 
+    fn visit_get(&mut self, node: &'b ExprGet<'a>) -> Self::Output {
+        let object = self.evaluate(&node.object)?;
+
+        if let Value::Instance(instance) = object {
+            return instance.borrow().get(node.name);
+        }
+
+        Err(RuntimeError::ClassError(
+            ClassError::InvalidPropertyAccess { token: node.name },
+        ))
+    }
+
     fn visit_assign(&mut self, node: &ExprAssign<'a>) -> Self::Output {
         let value = self.evaluate(&node.value)?;
 
-        // TODO: Clone
         let distance = self.locals.get(&Expr::Assign(node.clone())).cloned();
         match distance {
             Some(d) => {
@@ -275,6 +303,14 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
 
     fn visit_block(&mut self, node: &'b StmtBlock<'a>) -> Self::Output {
         self.execute_block(&node.statements, Environment::new(Some(self.environment)))?;
+        Ok(())
+    }
+
+    fn visit_class(&mut self, node: &'b StmtClass<'a>) -> Self::Output {
+        let env = self.get_mut_environment();
+        env.define(node.name.lexeme, None);
+        let class = LoxClass::new(node.name.lexeme);
+        env.assign(node.name, Value::Callable(Rc::new(class)))?;
         Ok(())
     }
 

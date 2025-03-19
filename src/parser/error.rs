@@ -73,6 +73,21 @@ pub enum ParserError<'a> {
     #[error("[line {}] Error: Expected {{ after block", token.line)]
     ExpectedRightBrace { token: Token<'a> },
 
+    #[error("[line {}] Expected class name", token.line)]
+    ExpectedClassName { token: Token<'a> },
+
+    #[error("[line {}] Expected {{ before class body", token.line)]
+    ExpectedLeftBraceBeforeClassBody { token: Token<'a> },
+
+    #[error("[line {}] Expected method", token.line)]
+    ExpectedMethod { token: Token<'a> },
+
+    #[error("[line {}] Expected }} after class body", token.line)]
+    ExpectedRightBraceAfterClassBody { token: Token<'a> },
+
+    #[error("[line {}] Expected property name after '.'", token.line)]
+    ExpectedPropertyNameAfterDot { token: Token<'a> },
+
     #[error("{0}")]
     TokenStream(#[from] TokenStreamError),
 }
@@ -134,6 +149,17 @@ impl<'a> ParserErrorContext {
             }
             ParserErrorContext::ExpectedSemicolonAfterReturnValue => {
                 ParserError::ExpectedSemicolonAfterReturnValue { token }
+            }
+            ParserErrorContext::ExpectedClassName => ParserError::ExpectedClassName { token },
+            ParserErrorContext::ExpectedMethod => ParserError::ExpectedMethod { token },
+            ParserErrorContext::ExpectedRightBraceAfterClassBody => {
+                ParserError::ExpectedRightBraceAfterClassBody { token }
+            }
+            ParserErrorContext::ExpectedLeftBraceBeforeClassBody => {
+                ParserError::ExpectedLeftBraceBeforeClassBody { token }
+            }
+            ParserErrorContext::ExpectedPropertyNameAfterDot => {
+                ParserError::ExpectedPropertyNameAfterDot { token }
             }
         }
     }

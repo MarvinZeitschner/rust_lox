@@ -40,6 +40,11 @@ pub enum Expression<'a> {
         operator: Token<'a>,
         right: Box<Expr<'a>>,
     },
+    Set {
+        object: Box<Expr<'a>>,
+        name: Token<'a>,
+        value: Box<Expr<'a>>,
+    },
     Unary {
         operator: Token<'a>,
         value: Box<Expr<'a>>,
@@ -53,6 +58,10 @@ pub enum Expression<'a> {
         callee: Box<Expr<'a>>,
         paren: Token<'a>,
         arguments: Vec<Expr<'a>>,
+    },
+    Get {
+        object: Box<Expr<'a>>,
+        name: Token<'a>,
     },
     Assign {
         name: Token<'a>,
@@ -68,6 +77,10 @@ pub enum Expression<'a> {
 pub enum Statement<'a> {
     Block {
         statements: Vec<Stmt<'a>>,
+    },
+    Class {
+        name: Token<'a>,
+        methods: Vec<StmtFunction<'a>>,
     },
     Expression {
         expr: Expr<'a>,

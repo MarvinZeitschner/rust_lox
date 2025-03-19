@@ -35,6 +35,9 @@ pub enum RuntimeError<'a> {
     CallableError(#[from] CallableError),
 
     #[error("{0}")]
+    ClassError(ClassError<'a>),
+
+    #[error("{0}")]
     ResolverError(#[from] ResolverError<'static>),
 
     // Not an actual Error, but rather a special type to unwind the interpreter to the call method of LoxCallable when a value is returned
@@ -49,6 +52,15 @@ pub enum CallableError {
 
     #[error("Parameter not Found; Internal Error")]
     ParamNotFound,
+}
+
+#[derive(Error, Debug, PartialEq, PartialOrd, Clone)]
+pub enum ClassError<'a> {
+    #[error("[line {}] Only instances have properties", token.line)]
+    InvalidPropertyAccess { token: Token<'a> },
+
+    #[error("[line {}] Undefined property {}", token.line, token.lexeme)]
+    UndefinedProperty { token: Token<'a> },
 }
 
 #[derive(Error, Debug, PartialEq, PartialOrd, Clone)]
