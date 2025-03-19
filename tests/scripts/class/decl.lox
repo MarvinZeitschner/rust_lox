@@ -4,4 +4,4 @@ class DevonshireCream {
   }
 }
 
-print DevonshireCream; // expect: "DevonshireCream"
+print DevonshireCream; // expect: DevonshireCream

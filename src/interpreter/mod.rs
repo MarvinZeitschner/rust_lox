@@ -284,7 +284,7 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
         let env = self.get_mut_environment();
         env.define(&node.name.lexeme, None);
         let class = LoxClass::new(node.name.lexeme);
-        env.assign(node.name, Value::Class(class))?;
+        env.assign(node.name, Value::Callable(Rc::new(class)))?;
         Ok(())
     }
 
