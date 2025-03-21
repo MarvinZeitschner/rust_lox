@@ -66,7 +66,8 @@ impl<'a> LoxInstance<'a> {
 
         let method = self.class.find_method(name.lexeme);
         if let Some(method) = method {
-            return Ok(Value::Callable(Rc::new(method.clone())));
+            // TODO: Clone
+            return Ok(Value::Callable(Rc::new(method.bind(self.clone()).clone())));
         }
 
         Err(RuntimeError::ClassError(ClassError::UndefinedProperty {

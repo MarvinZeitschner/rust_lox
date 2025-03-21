@@ -142,6 +142,11 @@ impl<'a, 'b: 'a> ExprVisitor<'a, 'b> for Resolver<'a> {
         Ok(())
     }
 
+    fn visit_this(&mut self, node: &'b ExprThis<'a>) -> Self::Output {
+        self.resolve_local(Expr::This(node.clone()), node.keyword);
+        Ok(())
+    }
+
     fn visit_unary(&mut self, node: &'b ExprUnary<'a>) -> Self::Output {
         self.resolve_expr(&node.value)?;
         Ok(())
@@ -202,9 +207,14 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
         self.declare(&node.name)?;
         self.define(&node.name);
 
+        self.begin_scope();
+        self.scopes.last_mut().unwrap().insert("this", true);
+
         node.methods
             .iter()
             .try_for_each(|fun| self.resolve_function(fun, FunctionType::Method))?;
+
+        self.end_scope();
 
         Ok(())
     }

@@ -1,8 +1,9 @@
-use std::{collections::VecDeque, fmt};
+use std::{cell::RefCell, collections::VecDeque, fmt, rc::Rc};
 
 use crate::ast::StmtFunction;
 
 use super::{
+    class::LoxInstance,
     environment::Environment,
     error::{CallableError, RuntimeError},
     value::Value,
@@ -36,6 +37,18 @@ impl<'a: 'b, 'b> LoxFunction<'a> {
         Self {
             declaration,
             closure,
+        }
+    }
+    pub fn bind(&self, instance: LoxInstance<'a>) -> Self {
+        let mut environment = Environment::new(Some(self.closure));
+        environment.define(
+            "this",
+            Some(Value::Instance(Rc::new(RefCell::new(instance)))),
+        );
+
+        Self {
+            declaration: self.declaration,
+            closure: Box::into_raw(Box::new(environment)),
         }
     }
 }
