@@ -45,6 +45,9 @@ pub enum Expression<'a> {
         name: Token<'a>,
         value: Box<Expr<'a>>,
     },
+    This {
+        keyword: Token<'a>,
+    },
     Unary {
         operator: Token<'a>,
         value: Box<Expr<'a>>,

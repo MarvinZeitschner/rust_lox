@@ -5,8 +5,8 @@ use error::{ParserError, ParserErrorContext, TokenStreamError};
 use crate::{
     ast::{
         Expr, ExprAssign, ExprBinary, ExprCall, ExprGet, ExprGrouping, ExprLiteral, ExprLogical,
-        ExprSet, ExprUnary, ExprVariable, LiteralValue, Stmt, StmtBlock, StmtClass, StmtExpression,
-        StmtFunction, StmtIf, StmtPrint, StmtReturn, StmtVar, StmtWhile,
+        ExprSet, ExprThis, ExprUnary, ExprVariable, LiteralValue, Stmt, StmtBlock, StmtClass,
+        StmtExpression, StmtFunction, StmtIf, StmtPrint, StmtReturn, StmtVar, StmtWhile,
     },
     lex::{Token, TokenType},
 };
@@ -572,6 +572,7 @@ impl<'a> Parser<'a> {
                 )?;
                 return Ok(Expr::Grouping(ExprGrouping::new(Box::new(expr))));
             }
+            TokenType::This => Ok(Expr::This(ExprThis::new(token))),
             TokenType::Ident => Ok(Expr::Variable(ExprVariable::new(token))),
             _ => Err(ParserError::UnexpectedToken { token }),
         }

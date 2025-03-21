@@ -37,6 +37,10 @@ impl<'a> ExprVisitor<'_, 'a> for AstPrinter {
         todo!()
     }
 
+    fn visit_this(&mut self, _node: &ExprThis<'a>) -> Self::Output {
+        todo!()
+    }
+
     fn visit_unary(&mut self, node: &ExprUnary) -> Self::Output {
         self.parenthesize(node.operator.lexeme, &[&node.value])
     }
