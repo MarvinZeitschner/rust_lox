@@ -179,6 +179,11 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
         Ok(value)
     }
 
+    fn visit_this(&mut self, node: &'b ExprThis<'a>) -> Self::Output {
+        // TODO: Clone
+        self.lookup_variable(node.keyword, &Expr::This(node.clone()))
+    }
+
     fn visit_unary(&mut self, node: &ExprUnary<'a>) -> Self::Output {
         let operator = node.operator;
         let right = self.evaluate(&node.value)?;
