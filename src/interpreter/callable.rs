@@ -30,13 +30,19 @@ impl<'a> fmt::Debug for dyn LoxCallable<'a> {
 pub struct LoxFunction<'a> {
     pub declaration: &'a StmtFunction<'a>,
     pub closure: *mut Environment<'a>,
+    pub is_initializer: bool,
 }
 
 impl<'a: 'b, 'b> LoxFunction<'a> {
-    pub fn new(declaration: &'a StmtFunction<'b>, closure: *mut Environment<'a>) -> Self {
+    pub fn new(
+        declaration: &'a StmtFunction<'b>,
+        closure: *mut Environment<'a>,
+        is_initializer: bool,
+    ) -> Self {
         Self {
             declaration,
             closure,
+            is_initializer,
         }
     }
     pub fn bind(&self, instance: LoxInstance<'a>) -> Self {
@@ -49,6 +55,17 @@ impl<'a: 'b, 'b> LoxFunction<'a> {
         Self {
             declaration: self.declaration,
             closure: Box::into_raw(Box::new(environment)),
+            is_initializer: self.is_initializer,
+        }
+    }
+
+    pub fn bind_rc(&self, instance: Rc<RefCell<LoxInstance<'a>>>) -> Self {
+        let mut environment = Environment::new(Some(self.closure));
+        environment.define("this", Some(Value::Instance(instance)));
+        Self {
+            declaration: self.declaration,
+            closure: Box::into_raw(Box::new(environment)),
+            is_initializer: self.is_initializer,
         }
     }
 }
@@ -74,14 +91,31 @@ impl<'a: 'b, 'b> LoxCallable<'a> for LoxFunction<'a> {
             environment.define(lexeme, Some(argument));
         }
 
-        match interpreter.execute_block(&self.declaration.body, environment) {
+        let res = match interpreter.execute_block(&self.declaration.body, environment) {
             Ok(_) => Ok(Value::Nil),
             Err(err) => match err {
                 // Safe to unwrap since there is already a check in the interpreter for this
-                RuntimeError::Return(value) => Ok(value.value.unwrap()),
+                RuntimeError::Return(value) => {
+                    if self.is_initializer {
+                        unsafe {
+                            let mut closure = Box::from_raw(self.closure);
+                            return Ok(closure.get_at(0, "this"));
+                        }
+                    }
+                    Ok(value.value.unwrap())
+                }
                 _ => Err(err),
             },
+        };
+
+        if self.is_initializer {
+            unsafe {
+                let mut closure = Box::from_raw(self.closure);
+                return Ok(closure.get_at(0, "this"));
+            }
         }
+
+        res
     }
 
     fn arity(&self) -> usize {

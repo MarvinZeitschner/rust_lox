@@ -318,7 +318,11 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
 
         let mut methods = HashMap::new();
         node.methods.iter().for_each(|method| {
-            let function = LoxFunction::new(method, self.get_ptr_environment());
+            let function = LoxFunction::new(
+                method,
+                self.get_ptr_environment(),
+                method.name.lexeme.eq("init"),
+            );
             methods.insert(method.name.lexeme, function);
         });
 
@@ -335,7 +339,7 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
     }
 
     fn visit_function(&mut self, node: &'b StmtFunction<'a>) -> Self::Output {
-        let function = LoxFunction::new(node, self.get_ptr_environment());
+        let function = LoxFunction::new(node, self.get_ptr_environment(), false);
 
         self.get_mut_environment()
             .define(node.name.lexeme, Some(Value::Callable(Rc::new(function))));

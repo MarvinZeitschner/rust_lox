@@ -27,15 +27,25 @@ impl<'a> LoxClass<'a> {
 impl<'a> LoxCallable<'a> for LoxClass<'a> {
     fn call(
         &self,
-        _interpreter: &mut super::Interpreter<'a>,
-        _arguments: std::collections::VecDeque<super::value::Value<'a>>,
+        interpreter: &mut super::Interpreter<'a>,
+        arguments: std::collections::VecDeque<super::value::Value<'a>>,
     ) -> Result<super::value::Value<'a>, super::error::RuntimeError<'a>> {
-        // TODO: Clone
-        let instance = LoxInstance::new(self.clone());
-        Ok(Value::Instance(Rc::new(RefCell::new(instance))))
+        let instance_rc = Rc::new(RefCell::new(LoxInstance::new(self.clone())));
+
+        if let Some(initializer) = self.find_method("init") {
+            initializer
+                .bind_rc(instance_rc.clone())
+                .call(interpreter, arguments)?;
+        }
+
+        Ok(Value::Instance(instance_rc))
     }
 
     fn arity(&self) -> usize {
+        let inizializer = self.find_method("init");
+        if let Some(initializer) = inizializer {
+            return initializer.arity();
+        }
         0
     }
 

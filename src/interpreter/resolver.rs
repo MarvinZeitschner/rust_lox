@@ -9,6 +9,7 @@ pub enum FunctionType {
     #[default]
     None,
     Function,
+    Initializer,
     Method,
 }
 
@@ -219,6 +220,7 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
     }
 
     fn visit_class(&mut self, node: &'b StmtClass<'a>) -> Self::Output {
+        let enclosing_class = self.current_class;
         self.current_class = ClassType::Class;
         self.declare(&node.name)?;
         self.define(&node.name);
@@ -226,13 +228,17 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
         self.begin_scope();
         self.scopes.last_mut().unwrap().insert("this", true);
 
-        node.methods
-            .iter()
-            .try_for_each(|fun| self.resolve_function(fun, FunctionType::Method))?;
+        node.methods.iter().try_for_each(|method| {
+            let mut declaration = FunctionType::Method;
+            if method.name.lexeme == "init" {
+                declaration = FunctionType::Initializer;
+            }
+            self.resolve_function(method, declaration)
+        })?;
 
         self.end_scope();
 
-        self.current_class = ClassType::None;
+        self.current_class = enclosing_class;
 
         Ok(())
     }
@@ -270,6 +276,12 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
         }
 
         if let Some(expr) = &node.value {
+            if self.current_function == FunctionType::Initializer {
+                return Err(ResolverError::ReturnInConstructor {
+                    token: node.keyword,
+                });
+            }
+
             self.resolve_expr(expr)?;
         }
         Ok(())
