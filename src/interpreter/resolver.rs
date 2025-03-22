@@ -12,11 +12,19 @@ pub enum FunctionType {
     Method,
 }
 
+#[derive(Default, Copy, Clone, PartialEq)]
+pub enum ClassType {
+    #[default]
+    None,
+    Class,
+}
+
 #[derive(Default)]
 pub struct Resolver<'a> {
     scopes: Vec<HashMap<&'a str, bool>>,
     locals: HashMap<Expr<'a>, usize>,
     current_function: FunctionType,
+    current_class: ClassType,
 }
 
 impl<'a, 'b: 'a> Resolver<'a> {
@@ -25,6 +33,7 @@ impl<'a, 'b: 'a> Resolver<'a> {
             scopes: vec![],
             locals: HashMap::new(),
             current_function: FunctionType::None,
+            current_class: ClassType::None,
         }
     }
 
@@ -143,6 +152,12 @@ impl<'a, 'b: 'a> ExprVisitor<'a, 'b> for Resolver<'a> {
     }
 
     fn visit_this(&mut self, node: &'b ExprThis<'a>) -> Self::Output {
+        if self.current_class == ClassType::None {
+            return Err(ResolverError::ThisOutsideClass {
+                token: node.keyword,
+            });
+        }
+
         self.resolve_local(Expr::This(node.clone()), node.keyword);
         Ok(())
     }
@@ -204,6 +219,7 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
     }
 
     fn visit_class(&mut self, node: &'b StmtClass<'a>) -> Self::Output {
+        self.current_class = ClassType::Class;
         self.declare(&node.name)?;
         self.define(&node.name);
 
@@ -215,6 +231,8 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
             .try_for_each(|fun| self.resolve_function(fun, FunctionType::Method))?;
 
         self.end_scope();
+
+        self.current_class = ClassType::None;
 
         Ok(())
     }

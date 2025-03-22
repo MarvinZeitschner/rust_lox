@@ -76,6 +76,9 @@ pub enum ResolverError<'a> {
 
     #[error("[line {}] Cannot return from top-level code", token.line)]
     TopLevelReturn { token: Token<'a> },
+
+    #[error("[line {}] Cannot use 'this' outside a class", token.line)]
+    ThisOutsideClass { token: Token<'a> },
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]

@@ -1,0 +1,5 @@
+fun notAMethod() {
+  print this;
+}
+
+notAMethod(); // expect runtime error: [line 2] Cannot use 'this' outside a class
