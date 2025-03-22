@@ -7,85 +7,85 @@ use crate::lex::Token;
 #[derive(Error, Debug, PartialEq, PartialOrd, Clone, EnumDiscriminants)]
 #[strum_discriminants(name(ParserErrorContext))]
 pub enum ParserError<'a> {
-    #[error("[line {}] Error: Expected ')' after expression", token.line)]
+    #[error("[line {}] Error: Expected ')' after expression.", token.line)]
     UnmatchedParanthesis { token: Token<'a> },
 
-    #[error("[line {}] Error: Expected '(' after if", token.line)]
+    #[error("[line {}] Error: Expected '(' after if.", token.line)]
     ExpectedLeftParenAfterIf { token: Token<'a> },
 
-    #[error("[line {}] Error: Expected '(' after for", token.line)]
+    #[error("[line {}] Error: Expected '(' after for.", token.line)]
     ExpectedLeftParenAfterFor { token: Token<'a> },
 
-    #[error("[line {}] Error: Expected '(' after while", token.line)]
+    #[error("[line {}] Error: Expected '(' after while.", token.line)]
     ExpectedLeftParenAfterWhile { token: Token<'a> },
 
-    #[error("[line {}] Error: Expected ')' after condition", token.line)]
+    #[error("[line {}] Error: Expected ')' after condition.", token.line)]
     ExpectedRightParenAfterCondition { token: Token<'a> },
 
-    #[error("[line {}] Error: Expected ')' after for clauses", token.line)]
+    #[error("[line {}] Error: Expected ')' after for clauses.", token.line)]
     ExpectedRightParenAfterForClause { token: Token<'a> },
 
-    #[error("[line {}] Error: Expected ')' after for arguments", token.line)]
+    #[error("[line {}] Error: Expected ')' after for arguments.", token.line)]
     ExpectedRightParenAfterArguments { token: Token<'a> },
 
-    #[error("[line {}] Error: Expected expression", token.line)]
+    #[error("[line {}] Error: Expected expression.", token.line)]
     ExpectedExpression { token: Token<'a> },
 
-    #[error("[line {}] Error: Expected semicolon", token.line)]
+    #[error("[line {}] Error: Expected semicolon.", token.line)]
     ExpectedSemicolon { token: Token<'a> },
 
-    #[error("[line {}] Error: Expected function name", token.line)]
+    #[error("[line {}] Error: Expected function name.", token.line)]
     ExpectedFunctionName { token: Token<'a> },
 
-    #[error("[line {}] Error: Expected ( after function name", token.line)]
+    #[error("[line {}] Error: Expected ( after function name.", token.line)]
     ExpectedLeftParenAfterFunctionName { token: Token<'a> },
 
-    #[error("[line {}] Error: Can't have more than 255 parameters", token.line)]
+    #[error("[line {}] Error: Can't have more than 255 parameters.", token.line)]
     TooManyFunctionParameters { token: Token<'a> },
 
-    #[error("[line {}] Error: Expected Parameter Name", token.line)]
+    #[error("[line {}] Error: Expected Parameter Name.", token.line)]
     ExpectedParameterName { token: Token<'a> },
 
-    #[error("[line {}] Error: Expected ) after parameters", token.line)]
+    #[error("[line {}] Error: Expected ) after parameters.", token.line)]
     ExpectedRightParenAfterParameters { token: Token<'a> },
 
-    #[error("[line {}] Error: Expected {{ before function body", token.line)]
+    #[error("[line {}] Error: Expected {{ before function body.", token.line)]
     ExpectedLeftBraceBeforeFunctionBody { token: Token<'a> },
 
-    #[error("[line {}] Error: Expected semicolon after loop condition", token.line)]
+    #[error("[line {}] Error: Expected semicolon after loop condition.", token.line)]
     ExpectedSemicolonAfterLoopCondition { token: Token<'a> },
 
-    #[error("[line {}] Error: Expected semicolon after return value", token.line)]
+    #[error("[line {}] Error: Expected semicolon after return value.", token.line)]
     ExpectedSemicolonAfterReturnValue { token: Token<'a> },
 
-    #[error("[line {}] Error: Unexpected token: {}", token.line, token.lexeme)]
+    #[error("[line {}] Error: Unexpected token: {}.", token.line, token.lexeme)]
     UnexpectedToken { token: Token<'a> },
 
-    #[error("[line {}] Error: Unexpected end of file", token.line)]
+    #[error("[line {}] Error: Unexpected end of file.", token.line)]
     UnexpectedEOF { token: Token<'a> },
 
-    #[error("[line {}] Error: Invalid assignment target", token.line)]
+    #[error("[line {}] Error: Invalid assignment target.", token.line)]
     InvalidAssignmentTarget { token: Token<'a> },
 
-    #[error("[line {}] Error: Can't have more than 255 arguments", token.line)]
+    #[error("[line {}] Error: Can't have more than 255 arguments.", token.line)]
     TooManyFunctionArguments { token: Token<'a> },
 
-    #[error("[line {}] Error: Expected {{ after block", token.line)]
+    #[error("[line {}] Error: Expected {{ after block.", token.line)]
     ExpectedRightBrace { token: Token<'a> },
 
-    #[error("[line {}] Expected class name", token.line)]
+    #[error("[line {}] Expected class name.", token.line)]
     ExpectedClassName { token: Token<'a> },
 
-    #[error("[line {}] Expected {{ before class body", token.line)]
+    #[error("[line {}] Expected {{ before class body.", token.line)]
     ExpectedLeftBraceBeforeClassBody { token: Token<'a> },
 
-    #[error("[line {}] Expected method", token.line)]
+    #[error("[line {}] Expected method.", token.line)]
     ExpectedMethod { token: Token<'a> },
 
-    #[error("[line {}] Expected }} after class body", token.line)]
+    #[error("[line {}] Expected }} after class body.", token.line)]
     ExpectedRightBraceAfterClassBody { token: Token<'a> },
 
-    #[error("[line {}] Expected property name after '.'", token.line)]
+    #[error("[line {}] Expected property name after '.'.", token.line)]
     ExpectedPropertyNameAfterDot { token: Token<'a> },
 
     #[error("{0}")]

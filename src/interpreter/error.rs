@@ -6,29 +6,29 @@ use super::value::Value;
 
 #[derive(Error, Debug, PartialEq, PartialOrd, Clone)]
 pub enum RuntimeError<'a> {
-    #[error("[line {}] Operand must be a number", operator.line)]
+    #[error("[line {}] Operand must be a number.", operator.line)]
     NumberOperand { operator: Token<'a> },
 
-    #[error("[line {}] Operands must be a number", operator.line)]
+    #[error("[line {}] Operands must be a number.", operator.line)]
     MutlipleNumberOperands { operator: Token<'a> },
 
-    #[error("[line {}] Operands must be two numbers or two strings", operator.line)]
+    #[error("[line {}] Operands must be two numbers or two strings.", operator.line)]
     NumberOrStringOperands { operator: Token<'a> },
 
-    #[error("[line {}] Undefined Variable '{}'", name.line, name.lexeme)]
+    #[error("[line {}] Undefined Variable '{}'.", name.line, name.lexeme)]
     UndefinedVariable { name: Token<'a> },
 
-    #[error("[line {}] Can only call functions and classes", token.line)]
+    #[error("[line {}] Can only call functions and classes.", token.line)]
     NotCallable { token: Token<'a> },
 
-    #[error("[line {}] Expected {} arguments but got {}", token.line, expected_arity, given_len)]
+    #[error("[line {}] Expected {} arguments but got {}.", token.line, expected_arity, given_len)]
     ArgumentCount {
         token: Token<'a>,
         expected_arity: usize,
         given_len: usize,
     },
 
-    #[error("Internal Error: Error while creating environments")]
+    #[error("Internal Error: Error while creating environments.")]
     EnvironmentCreationError,
 
     #[error("{0}")]
@@ -41,7 +41,7 @@ pub enum RuntimeError<'a> {
     ResolverError(#[from] ResolverError<'static>),
 
     // Not an actual Error, but rather a special type to unwind the interpreter to the call method of LoxCallable when a value is returned
-    #[error("Internal Error: Unhandled return")]
+    #[error("Internal Error: Unhandled return.")]
     Return(Return<'a>),
 }
 
@@ -56,31 +56,31 @@ pub enum CallableError {
 
 #[derive(Error, Debug, PartialEq, PartialOrd, Clone)]
 pub enum ClassError<'a> {
-    #[error("[line {}] Only instances have properties", token.line)]
+    #[error("[line {}] Only instances have properties.", token.line)]
     InvalidPropertyAccess { token: Token<'a> },
 
-    #[error("[line {}] Undefined property {}", token.line, token.lexeme)]
+    #[error("[line {}] Undefined property {}.", token.line, token.lexeme)]
     UndefinedProperty { token: Token<'a> },
 }
 
 #[derive(Error, Debug, PartialEq, PartialOrd, Clone)]
 pub enum ResolverError<'a> {
-    #[error("[line {}] Can't read local variable in its own initializer", token.line)]
+    #[error("[line {}] Can't read local variable in its own initializer.", token.line)]
     VariableInOwnInitializer { token: Token<'a> },
 
     #[error("Internal Error")]
     InternalResolverError,
 
-    #[error("[line {}] Already a variable with the same name in the scope", token.line)]
+    #[error("[line {}] Already a variable with the same name in the scope.", token.line)]
     SameNameVariableInLocalScope { token: Token<'a> },
 
-    #[error("[line {}] Cannot return from top-level code", token.line)]
+    #[error("[line {}] Cannot return from top-level code.", token.line)]
     TopLevelReturn { token: Token<'a> },
 
-    #[error("[line {}] Cannot use 'this' outside a class", token.line)]
+    #[error("[line {}] Cannot use 'this' outside a class.", token.line)]
     ThisOutsideClass { token: Token<'a> },
 
-    #[error("[line {}] Cannot return a value from a constructor", token.line)]
+    #[error("[line {}] Can't return a value from an initializer.", token.line)]
     ReturnInConstructor { token: Token<'a> },
 }
 

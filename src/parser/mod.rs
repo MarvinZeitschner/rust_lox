@@ -273,7 +273,9 @@ impl<'a> Parser<'a> {
         // We don't explicitly use the None value. So rust thinks it shouldn't be assigned
         #[allow(unused_assignments)]
         let mut initializer = None;
-        if self.tokenstream.match_l(&[TokenType::Var])? {
+        if self.tokenstream.match_l(&[TokenType::Semicolon])? {
+            initializer = None;
+        } else if self.tokenstream.match_l(&[TokenType::Var])? {
             initializer = Some(self.var_declaration()?);
         } else {
             initializer = Some(self.expression_statement()?);
