@@ -1,8 +1,0 @@
-var a = "before";
-print a; // expect: before
-
-a = "after";
-print a; // expect: after
-
-print a = "inline"; // expect: inline
-print a; // expect: inline

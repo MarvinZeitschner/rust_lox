@@ -6,7 +6,9 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.5.26", features = ["derive"] }
 thiserror = "2.0.11"
+strum = { version = "0.27.1", features = ["derive"] }
 ast_macro = { path = "ast_macro" }
+
+[dev-dependencies]
 regex = "1.11.1"
 test-generator = "0.3.1"
-strum = { version = "0.27.1", features = ["derive"] }

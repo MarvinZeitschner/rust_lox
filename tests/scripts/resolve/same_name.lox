@@ -1,4 +1,0 @@
-fun test() {
-  var a = 1;
-  var a = 2; // expect runtime error: [line 3] Already a variable with the same name in the scope
-}

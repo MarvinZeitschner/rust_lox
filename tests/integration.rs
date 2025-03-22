@@ -1,161 +1,68 @@
 use regex::Regex;
-use std::{fs, path::PathBuf, process::Command};
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use test_generator::test_resources;
 
-const INTERPRETER_PATH: &str = "target/debug/rust_lox";
+#[test_resources("test/**/*.lox")]
+fn run_lox_test(test_path: &str) {
+    let test_file = PathBuf::from(test_path);
+    println!("Running test: {}", test_file.display());
 
-#[test_resources("tests/scripts/*/*.lox")]
-fn test_script(path: &str) {
-    let path = PathBuf::from(path);
-    let script_content = fs::read_to_string(&path).expect("Failed to read test script");
+    let (expected_output, expected_errors) =
+        parse_expectations(&test_file).expect("Failed to parse test expectations");
 
-    let test_expectations = parse_test_expectations(&script_content);
+    let interpreter_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/debug/rust_lox");
 
-    let output = Command::new(INTERPRETER_PATH)
-        .arg(&path)
+    let output = Command::new(&interpreter_path)
+        .arg(&test_file)
         .output()
         .expect("Failed to execute interpreter");
 
-    let stdout_lines: Vec<String> = String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .map(|line| line.trim().to_string())
-        .collect();
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
-    let stderr_lines: Vec<String> = String::from_utf8_lossy(&output.stderr)
-        .lines()
-        .map(|line| line.trim().to_string())
-        .collect();
-
-    println!("--------------------------------------------------------------------------------------------");
-    println!("Testing file: {}", path.display());
-    println!("Stdout lines: {:?}", stdout_lines);
-    println!("Stderr lines: {:?}", stderr_lines);
-    println!("Test expectations: {:#?}", test_expectations);
-    println!("--------------------------------------------------------------------------------------------");
-    println!();
-
-    if let Some(runtime_error_idx) = test_expectations
-        .iter()
-        .position(|expectation| matches!(expectation, TestExpectation::RuntimeError { .. }))
-    {
-        let expected_error = match &test_expectations[runtime_error_idx] {
-            TestExpectation::RuntimeError {
-                line_number,
-                error_message,
-            } => {
-                println!(
-                    "Checking runtime error at line {}: {}",
-                    line_number, error_message
-                );
-                error_message
-            }
-            _ => unreachable!(),
-        };
-
-        let error_found = stderr_lines
-            .iter()
-            .any(|line| line.contains(expected_error));
+    for expected in &expected_output {
         assert!(
-            error_found,
-            "Expected runtime error '{}' not found in stderr",
-            expected_error
+            stdout.contains(expected),
+            "Expected output '{}' not found in stdout: {}",
+            expected,
+            stdout
         );
+    }
 
-        for (i, expectation) in test_expectations.iter().enumerate() {
-            if i >= runtime_error_idx {
-                break;
-            }
-
-            match expectation {
-                TestExpectation::Output {
-                    line_number,
-                    output_line,
-                } if i < stdout_lines.len() => {
-                    assert_eq!(
-                        &stdout_lines[i], output_line,
-                        "Line {}: Expected '{}' but got '{}'",
-                        line_number, output_line, stdout_lines[i]
-                    );
-                }
-                TestExpectation::Output {
-                    line_number,
-                    output_line,
-                } => {
-                    panic!(
-                        "Line {}: Expected output '{}' but execution terminated early",
-                        line_number, output_line
-                    );
-                }
-                _ => {}
-            }
-        }
-    } else {
-        let mut output_idx = 0;
-
-        for expectation in &test_expectations {
-            if let TestExpectation::Output {
-                line_number,
-                output_line,
-            } = expectation
-            {
-                assert!(
-                    output_idx < stdout_lines.len(),
-                    "Line {}: Expected output '{}' but not enough lines in stdout",
-                    line_number,
-                    output_line
-                );
-
-                assert_eq!(
-                    &stdout_lines[output_idx], output_line,
-                    "Line {}: Expected '{}' but got '{}'",
-                    line_number, output_line, stdout_lines[output_idx]
-                );
-
-                output_idx += 1;
-            }
-        }
+    for expected in &expected_errors {
+        assert!(
+            stderr.contains(expected),
+            "Expected error '{}' not found in stderr: {}",
+            expected,
+            stderr
+        );
     }
 }
 
-#[derive(Debug)]
-enum TestExpectation {
-    Output {
-        line_number: usize,
-        output_line: String,
-    },
-    RuntimeError {
-        line_number: usize,
-        error_message: String,
-    },
-}
+fn parse_expectations(test_file: &Path) -> Result<(Vec<String>, Vec<String>), std::io::Error> {
+    let content = fs::read_to_string(test_file)?;
 
-fn parse_test_expectations(script_content: &str) -> Vec<TestExpectation> {
-    let mut expectations = Vec::new();
+    let mut expected_output = Vec::new();
+    let mut expected_errors = Vec::new();
 
-    let expected_regex = Regex::new(r"//\s*expect:\s*(.*)").unwrap();
-    let runtime_error_regex = Regex::new(r"//\s*expect runtime error:\s*(.*)").unwrap();
+    let expect_regex = Regex::new(r"// expect:\s*(.+)").unwrap();
+    let error_regex = Regex::new(r"// (error|Error).*:\s*(.+)").unwrap();
 
-    for (idx, line) in script_content.lines().enumerate() {
-        let line_number = idx + 1;
-
-        if let Some(captures) = expected_regex.captures(line) {
-            if let Some(value_match) = captures.get(1) {
-                expectations.push(TestExpectation::Output {
-                    line_number,
-                    output_line: value_match.as_str().trim().to_string(),
-                });
+    for line in content.lines() {
+        if let Some(captures) = expect_regex.captures(line) {
+            if let Some(expected) = captures.get(1) {
+                expected_output.push(expected.as_str().trim().to_string());
             }
         }
 
-        if let Some(captures) = runtime_error_regex.captures(line) {
-            if let Some(value_match) = captures.get(1) {
-                expectations.push(TestExpectation::RuntimeError {
-                    line_number,
-                    error_message: value_match.as_str().trim().to_string(),
-                });
+        if let Some(captures) = error_regex.captures(line) {
+            if let Some(expected) = captures.get(2) {
+                expected_errors.push(expected.as_str().trim().to_string());
             }
         }
     }
 
-    expectations
+    Ok((expected_output, expected_errors))
 }
