@@ -32,6 +32,6 @@ impl<'a> LoxCallable<'a> for Clock {
     }
 
     fn to_string(&self) -> String {
-        String::from("<native fun: clock>")
+        String::from("<native fn>")
     }
 }

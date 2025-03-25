@@ -123,6 +123,6 @@ impl<'a: 'b, 'b> LoxCallable<'a> for LoxFunction<'a> {
     }
 
     fn to_string(&self) -> String {
-        format!("<fn {} >", self.declaration.name.lexeme)
+        format!("<fn {}>", self.declaration.name.lexeme)
     }
 }

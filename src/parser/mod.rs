@@ -343,7 +343,7 @@ impl<'a> Parser<'a> {
             if parameters.len() >= 255 {
                 let token = self.tokenstream.peek()?;
                 let err = ParserError::TooManyFunctionParameters { token: *token };
-                eprintln!("{err:?}");
+                eprintln!("{}", err);
             }
             parameters.push(
                 self.tokenstream
@@ -354,7 +354,7 @@ impl<'a> Parser<'a> {
                 if parameters.len() >= 255 {
                     let token = self.tokenstream.peek()?;
                     let err = ParserError::TooManyFunctionParameters { token: *token };
-                    eprintln!("{err:?}");
+                    eprintln!("{}", err);
                 }
                 parameters.push(
                     self.tokenstream
@@ -407,7 +407,7 @@ impl<'a> Parser<'a> {
             if arguments.len() >= 255 {
                 let token = self.tokenstream.peek()?;
                 let err = ParserError::TooManyFunctionArguments { token: *token };
-                eprintln!("{err:?}");
+                eprintln!("{}", err);
             }
             arguments.push(self.expression()?);
 
@@ -415,7 +415,7 @@ impl<'a> Parser<'a> {
                 if arguments.len() >= 255 {
                     let token = self.tokenstream.peek()?;
                     let err = ParserError::TooManyFunctionArguments { token: *token };
-                    eprintln!("{err:?}");
+                    eprintln!("{}", err);
                 }
                 arguments.push(self.expression()?);
             }

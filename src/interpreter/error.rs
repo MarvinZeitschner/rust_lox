@@ -71,13 +71,13 @@ pub enum ResolverError<'a> {
     #[error("Internal Error")]
     InternalResolverError,
 
-    #[error("[line {}] Already a variable with the same name in the scope.", token.line)]
+    #[error("[line {}] Already a variable with this name in this scope.", token.line)]
     SameNameVariableInLocalScope { token: Token<'a> },
 
-    #[error("[line {}] Cannot return from top-level code.", token.line)]
+    #[error("[line {}] Can't return from top-level code.", token.line)]
     TopLevelReturn { token: Token<'a> },
 
-    #[error("[line {}] Cannot use 'this' outside a class.", token.line)]
+    #[error("[line {}] Can't use 'this' outside of a class.", token.line)]
     ThisOutsideClass { token: Token<'a> },
 
     #[error("[line {}] Can't return a value from an initializer.", token.line)]
