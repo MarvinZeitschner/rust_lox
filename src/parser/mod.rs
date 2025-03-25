@@ -131,6 +131,16 @@ impl<'a> Parser<'a> {
         let name = self
             .tokenstream
             .consume(&TokenType::Ident, ParserErrorContext::ExpectedClassName)?;
+
+        let mut superclass = None;
+        if self.tokenstream.match_l(&[TokenType::Less])? {
+            self.tokenstream.consume(
+                &TokenType::Ident,
+                ParserErrorContext::ExpectedSuperclassName,
+            )?;
+            superclass = Some(ExprVariable::new(self.tokenstream.previous()?));
+        }
+
         self.tokenstream.consume(
             &TokenType::LeftBrace,
             ParserErrorContext::ExpectedLeftBraceBeforeClassBody,
@@ -151,7 +161,7 @@ impl<'a> Parser<'a> {
             ParserErrorContext::ExpectedRightBraceAfterClassBody,
         )?;
 
-        Ok(Stmt::Class(StmtClass::new(name, methods)))
+        Ok(Stmt::Class(StmtClass::new(name, superclass, methods)))
     }
 
     fn var_declaration(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {

@@ -83,6 +83,7 @@ pub enum Statement<'a> {
     },
     Class {
         name: Token<'a>,
+        superclass: Option<ExprVariable<'a>>,
         methods: Vec<StmtFunction<'a>>,
     },
     Expression {

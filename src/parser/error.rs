@@ -88,6 +88,9 @@ pub enum ParserError<'a> {
     #[error("[line {}] Expected property name after '.'.", token.line)]
     ExpectedPropertyNameAfterDot { token: Token<'a> },
 
+    #[error("[line {}] Expected superclass name.", token.line)]
+    ExpectedSuperclassName { token: Token<'a> },
+
     #[error("{0}")]
     TokenStream(#[from] TokenStreamError),
 }
@@ -160,6 +163,9 @@ impl<'a> ParserErrorContext {
             }
             ParserErrorContext::ExpectedPropertyNameAfterDot => {
                 ParserError::ExpectedPropertyNameAfterDot { token }
+            }
+            ParserErrorContext::ExpectedSuperclassName => {
+                ParserError::ExpectedSuperclassName { token }
             }
         }
     }
