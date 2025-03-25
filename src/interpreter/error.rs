@@ -86,5 +86,5 @@ pub enum ResolverError<'a> {
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct Return<'a> {
-    pub value: Option<Value<'a>>,
+    pub value: Value<'a>,
 }

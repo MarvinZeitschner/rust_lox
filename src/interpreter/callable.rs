@@ -102,7 +102,7 @@ impl<'a: 'b, 'b> LoxCallable<'a> for LoxFunction<'a> {
                             return Ok(closure.get_at(0, "this"));
                         }
                     }
-                    Ok(value.value.unwrap())
+                    Ok(value.value)
                 }
                 _ => Err(err),
             },

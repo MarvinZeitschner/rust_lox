@@ -365,10 +365,10 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
     }
 
     fn visit_return(&mut self, node: &'b StmtReturn<'a>) -> Self::Output {
-        let mut value = None;
+        let mut value = Value::Nil;
 
         if node.value.is_some() {
-            value = Some(self.evaluate(node.value.as_ref().unwrap())?);
+            value = self.evaluate(node.value.as_ref().unwrap())?;
         }
 
         Err(RuntimeError::Return(Return { value }))
