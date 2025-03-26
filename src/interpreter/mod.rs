@@ -26,11 +26,7 @@ use crate::{
 #[derive(Clone)]
 pub struct Interpreter<'a> {
     environment: *mut Environment<'a>,
-    // rust sees globals as unused, but its actually used for native functions. A reference to a
-    // raw ptr of globals is safed in the environment
-    #[allow(dead_code)]
     globals: Box<Environment<'a>>,
-
     locals: HashMap<Expr<'a>, usize>,
 }
 
@@ -312,9 +308,21 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
     }
 
     fn visit_class(&mut self, node: &'b StmtClass<'a>) -> Self::Output {
-        {
-            self.get_mut_environment().define(node.name.lexeme, None);
+        let mut superclass = None;
+        if let Some(sc) = &node.superclass {
+            let evaluated_superclass = self.evaluate(sc)?;
+            superclass = match evaluated_superclass {
+                Value::Callable(callable) => {
+                    let class = callable.clone_as_class().ok_or(RuntimeError::ClassError(
+                        ClassError::SuperclassNotAClass { token: node.name },
+                    ))?;
+                    Some(class)
+                }
+                _ => None,
+            };
         }
+
+        self.get_mut_environment().define(node.name.lexeme, None);
 
         let mut methods = HashMap::new();
         node.methods.iter().for_each(|method| {
@@ -326,7 +334,7 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
             methods.insert(method.name.lexeme, function);
         });
 
-        let class = LoxClass::new(node.name.lexeme, methods);
+        let class = LoxClass::new(node.name.lexeme, superclass, methods);
         self.get_mut_environment()
             .assign(node.name, Value::Callable(Rc::new(class)))?;
 

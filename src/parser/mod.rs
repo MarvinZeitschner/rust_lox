@@ -138,7 +138,9 @@ impl<'a> Parser<'a> {
                 &TokenType::Ident,
                 ParserErrorContext::ExpectedSuperclassName,
             )?;
-            superclass = Some(ExprVariable::new(self.tokenstream.previous()?));
+            superclass = Some(Expr::Variable(ExprVariable::new(
+                self.tokenstream.previous()?,
+            )));
         }
 
         self.tokenstream.consume(

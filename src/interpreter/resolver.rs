@@ -97,7 +97,7 @@ impl<'a, 'b: 'a> Resolver<'a> {
     fn resolve_local(&mut self, expr: Expr<'a>, name: Token<'a>) {
         for (i, scope) in self.scopes.iter().enumerate().rev() {
             if scope.contains_key(name.lexeme) {
-                self.locals.insert(expr.clone(), self.scopes.len() - 1 - i);
+                self.locals.insert(expr, self.scopes.len() - 1 - i);
                 return;
             }
         }
@@ -224,6 +224,20 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
         self.current_class = ClassType::Class;
         self.declare(&node.name)?;
         self.define(&node.name);
+
+        if let Some(superclass) = &node.superclass {
+            if let Expr::Variable(superclass) = superclass {
+                if superclass.name.lexeme == node.name.lexeme {
+                    return Err(ResolverError::InheritanceCycle {
+                        token: superclass.name,
+                    });
+                }
+            } else {
+                panic!("Internal error");
+            }
+            self.current_class = ClassType::Class;
+            self.resolve_expr(superclass)?;
+        }
 
         self.begin_scope();
         self.scopes.last_mut().unwrap().insert("this", true);

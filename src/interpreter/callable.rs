@@ -3,12 +3,17 @@ use std::{cell::RefCell, collections::VecDeque, fmt, rc::Rc};
 use crate::ast::StmtFunction;
 
 use super::{
-    class::LoxInstance,
+    class::{LoxClass, LoxInstance},
     environment::Environment,
     error::{CallableError, RuntimeError},
     value::Value,
     Interpreter,
 };
+
+pub enum CallType {
+    Class,
+    Function,
+}
 
 pub trait LoxCallable<'a>: 'a {
     fn call(
@@ -18,6 +23,12 @@ pub trait LoxCallable<'a>: 'a {
     ) -> Result<Value<'a>, RuntimeError<'a>>;
     fn arity(&self) -> usize;
     fn to_string(&self) -> String;
+    fn call_type(&self) -> CallType {
+        CallType::Function
+    }
+    fn clone_as_class(&self) -> Option<Rc<LoxClass<'a>>> {
+        None
+    }
 }
 
 impl<'a> fmt::Debug for dyn LoxCallable<'a> {
@@ -70,7 +81,7 @@ impl<'a: 'b, 'b> LoxFunction<'a> {
     }
 }
 
-impl<'a: 'b, 'b> LoxCallable<'a> for LoxFunction<'a> {
+impl<'a> LoxCallable<'a> for LoxFunction<'a> {
     fn call(
         &self,
         interpreter: &mut Interpreter<'a>,
@@ -94,7 +105,6 @@ impl<'a: 'b, 'b> LoxCallable<'a> for LoxFunction<'a> {
         let res = match interpreter.execute_block(&self.declaration.body, environment) {
             Ok(_) => Ok(Value::Nil),
             Err(err) => match err {
-                // Safe to unwrap since there is already a check in the interpreter for this
                 RuntimeError::Return(value) => {
                     if self.is_initializer {
                         unsafe {
