@@ -37,6 +37,10 @@ impl<'a> ExprVisitor<'_, 'a> for AstPrinter {
         todo!()
     }
 
+    fn visit_super(&mut self, _node: &ExprSuper<'a>) -> Self::Output {
+        todo!()
+    }
+
     fn visit_this(&mut self, _node: &ExprThis<'a>) -> Self::Output {
         todo!()
     }

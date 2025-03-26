@@ -45,6 +45,10 @@ pub enum Expression<'a> {
         name: Token<'a>,
         value: Box<Expr<'a>>,
     },
+    Super {
+        keyword: Token<'a>,
+        method: Token<'a>,
+    },
     This {
         keyword: Token<'a>,
     },

@@ -91,6 +91,12 @@ pub enum ParserError<'a> {
     #[error("[line {}] Expected superclass name.", token.line)]
     ExpectedSuperclassName { token: Token<'a> },
 
+    #[error("[line {}] Expected '.' after 'super'.", token.line)]
+    ExpectedDotAfterSuper { token: Token<'a> },
+
+    #[error("[line {}] Expected superclass method name.", token.line)]
+    ExpectedSuperclassMethodName { token: Token<'a> },
+
     #[error("{0}")]
     TokenStream(#[from] TokenStreamError),
 }
@@ -166,6 +172,12 @@ impl<'a> ParserErrorContext {
             }
             ParserErrorContext::ExpectedSuperclassName => {
                 ParserError::ExpectedSuperclassName { token }
+            }
+            ParserErrorContext::ExpectedDotAfterSuper => {
+                ParserError::ExpectedDotAfterSuper { token }
+            }
+            ParserErrorContext::ExpectedSuperclassMethodName => {
+                ParserError::ExpectedSuperclassMethodName { token }
             }
         }
     }
