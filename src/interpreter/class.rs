@@ -29,7 +29,15 @@ impl<'a> LoxClass<'a> {
     }
 
     pub fn find_method(&self, name: &str) -> Option<&LoxFunction<'a>> {
-        self.methods.get(name)
+        if self.methods.contains_key(name) {
+            return self.methods.get(name);
+        }
+
+        if let Some(superclass) = &self.superclass {
+            return superclass.find_method(name);
+        }
+
+        None
     }
 }
 
