@@ -197,11 +197,12 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
                 }))
             }
         };
-
-        let object_instance = match object {
-            Value::Instance(instance) => instance.borrow().clone(), // Extract the actual LoxInstance
+        let object = match object {
+            Value::Instance(instance) => instance,
             _ => {
-                panic!("Internal Error: 'this' is not an instance.");
+                return Err(RuntimeError::ClassError(ClassError::SuperclassNotAClass {
+                    token: node.keyword,
+                }))
             }
         };
 
@@ -211,7 +212,8 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
                 token: node.method,
             }))?;
 
-        Ok(Value::Callable(Rc::new(method.bind(object_instance))))
+        let a = method.bind_rc(object);
+        Ok(Value::Callable(Rc::new(a)))
     }
 
     fn visit_this(&mut self, node: &'b ExprThis<'a>) -> Self::Output {

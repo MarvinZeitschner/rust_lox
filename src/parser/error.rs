@@ -94,7 +94,7 @@ pub enum ParserError<'a> {
     #[error("[line {}] Expected '.' after 'super'.", token.line)]
     ExpectedDotAfterSuper { token: Token<'a> },
 
-    #[error("[line {}] Expected superclass method name.", token.line)]
+    #[error("[line {}] Expect superclass method name.", token.line)]
     ExpectedSuperclassMethodName { token: Token<'a> },
 
     #[error("{0}")]
