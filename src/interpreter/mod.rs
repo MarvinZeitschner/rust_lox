@@ -26,11 +26,7 @@ use crate::{
 #[derive(Clone)]
 pub struct Interpreter<'a> {
     environment: *mut Environment<'a>,
-    // rust sees globals as unused, but its actually used for native functions. A reference to a
-    // raw ptr of globals is safed in the environment
-    #[allow(dead_code)]
     globals: Box<Environment<'a>>,
-
     locals: HashMap<Expr<'a>, usize>,
 }
 
@@ -179,6 +175,47 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
         Ok(value)
     }
 
+    fn visit_super(&mut self, node: &'b ExprSuper<'a>) -> Self::Output {
+        let distance = self
+            .locals
+            .get(&Expr::Super(node.clone()))
+            .cloned()
+            .unwrap();
+
+        let superclass = self.get_mut_environment().get_at(distance, "super");
+        let object = self.get_mut_environment().get_at(distance - 1, "this");
+
+        let superclass = match superclass {
+            Value::Callable(callable) => callable.clone_as_class().ok_or(
+                RuntimeError::ClassError(ClassError::SuperclassNotAClass {
+                    token: node.keyword,
+                }),
+            )?,
+            _ => {
+                return Err(RuntimeError::ClassError(ClassError::SuperclassNotAClass {
+                    token: node.keyword,
+                }))
+            }
+        };
+        let object = match object {
+            Value::Instance(instance) => instance,
+            _ => {
+                return Err(RuntimeError::ClassError(ClassError::SuperclassNotAClass {
+                    token: node.keyword,
+                }))
+            }
+        };
+
+        let method = superclass
+            .find_method(node.method.lexeme)
+            .ok_or(RuntimeError::ClassError(ClassError::UndefinedProperty {
+                token: node.method,
+            }))?;
+
+        let a = method.bind_rc(object);
+        Ok(Value::Callable(Rc::new(a)))
+    }
+
     fn visit_this(&mut self, node: &'b ExprThis<'a>) -> Self::Output {
         // TODO: Clone
         self.lookup_variable(node.keyword, &Expr::This(node.clone()))
@@ -312,8 +349,26 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
     }
 
     fn visit_class(&mut self, node: &'b StmtClass<'a>) -> Self::Output {
-        {
-            self.get_mut_environment().define(node.name.lexeme, None);
+        let mut superclass = None;
+        let mut superclass_value = None;
+        if let Some(sc) = &node.superclass {
+            superclass_value = Some(self.evaluate(sc)?);
+            superclass = match superclass_value.as_ref().unwrap() {
+                Value::Callable(callable) => {
+                    let class = callable.clone_as_class().ok_or(RuntimeError::ClassError(
+                        ClassError::SuperclassNotAClass { token: node.name },
+                    ))?;
+                    Some(class)
+                }
+                _ => None,
+            };
+        }
+
+        self.get_mut_environment().define(node.name.lexeme, None);
+
+        if node.superclass.is_some() {
+            self.environment = Box::into_raw(Box::new(Environment::new(Some(self.environment))));
+            self.get_mut_environment().define("super", superclass_value);
         }
 
         let mut methods = HashMap::new();
@@ -326,7 +381,12 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
             methods.insert(method.name.lexeme, function);
         });
 
-        let class = LoxClass::new(node.name.lexeme, methods);
+        let class = LoxClass::new(node.name.lexeme, superclass, methods);
+
+        if node.superclass.is_some() {
+            self.environment = self.get_mut_environment().enclosing.unwrap();
+        }
+
         self.get_mut_environment()
             .assign(node.name, Value::Callable(Rc::new(class)))?;
 

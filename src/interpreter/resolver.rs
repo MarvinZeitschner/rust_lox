@@ -18,6 +18,7 @@ pub enum ClassType {
     #[default]
     None,
     Class,
+    Subclass,
 }
 
 #[derive(Default)]
@@ -97,7 +98,7 @@ impl<'a, 'b: 'a> Resolver<'a> {
     fn resolve_local(&mut self, expr: Expr<'a>, name: Token<'a>) {
         for (i, scope) in self.scopes.iter().enumerate().rev() {
             if scope.contains_key(name.lexeme) {
-                self.locals.insert(expr.clone(), self.scopes.len() - 1 - i);
+                self.locals.insert(expr, self.scopes.len() - 1 - i);
                 return;
             }
         }
@@ -149,6 +150,20 @@ impl<'a, 'b: 'a> ExprVisitor<'a, 'b> for Resolver<'a> {
     fn visit_set(&mut self, node: &'b ExprSet<'a>) -> Self::Output {
         self.resolve_expr(&node.value)?;
         self.resolve_expr(&node.object)?;
+        Ok(())
+    }
+
+    fn visit_super(&mut self, node: &'b ExprSuper<'a>) -> Self::Output {
+        if self.current_class == ClassType::None {
+            return Err(ResolverError::SuperOutsideClass {
+                token: node.keyword,
+            });
+        } else if self.current_class != ClassType::Subclass {
+            return Err(ResolverError::SuperInClassWithoutSuperclass {
+                token: node.keyword,
+            });
+        }
+        self.resolve_local(Expr::Super(node.clone()), node.keyword);
         Ok(())
     }
 
@@ -225,6 +240,26 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
         self.declare(&node.name)?;
         self.define(&node.name);
 
+        if let Some(superclass) = &node.superclass {
+            if let Expr::Variable(superclass) = superclass {
+                if superclass.name.lexeme == node.name.lexeme {
+                    return Err(ResolverError::InheritanceCycle {
+                        token: superclass.name,
+                    });
+                }
+            } else {
+                panic!("Internal error");
+            }
+            self.current_class = ClassType::Class;
+            self.resolve_expr(superclass)?;
+        }
+
+        if node.superclass.is_some() {
+            self.current_class = ClassType::Subclass;
+            self.begin_scope();
+            self.scopes.last_mut().unwrap().insert("super", true);
+        }
+
         self.begin_scope();
         self.scopes.last_mut().unwrap().insert("this", true);
 
@@ -237,6 +272,10 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
         })?;
 
         self.end_scope();
+
+        if node.superclass.is_some() {
+            self.end_scope();
+        }
 
         self.current_class = enclosing_class;
 

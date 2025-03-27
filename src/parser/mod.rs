@@ -5,8 +5,8 @@ use error::{ParserError, ParserErrorContext, TokenStreamError};
 use crate::{
     ast::{
         Expr, ExprAssign, ExprBinary, ExprCall, ExprGet, ExprGrouping, ExprLiteral, ExprLogical,
-        ExprSet, ExprThis, ExprUnary, ExprVariable, LiteralValue, Stmt, StmtBlock, StmtClass,
-        StmtExpression, StmtFunction, StmtIf, StmtPrint, StmtReturn, StmtVar, StmtWhile,
+        ExprSet, ExprSuper, ExprThis, ExprUnary, ExprVariable, LiteralValue, Stmt, StmtBlock,
+        StmtClass, StmtExpression, StmtFunction, StmtIf, StmtPrint, StmtReturn, StmtVar, StmtWhile,
     },
     lex::{Token, TokenType},
 };
@@ -131,6 +131,18 @@ impl<'a> Parser<'a> {
         let name = self
             .tokenstream
             .consume(&TokenType::Ident, ParserErrorContext::ExpectedClassName)?;
+
+        let mut superclass = None;
+        if self.tokenstream.match_l(&[TokenType::Less])? {
+            self.tokenstream.consume(
+                &TokenType::Ident,
+                ParserErrorContext::ExpectedSuperclassName,
+            )?;
+            superclass = Some(Expr::Variable(ExprVariable::new(
+                self.tokenstream.previous()?,
+            )));
+        }
+
         self.tokenstream.consume(
             &TokenType::LeftBrace,
             ParserErrorContext::ExpectedLeftBraceBeforeClassBody,
@@ -151,7 +163,7 @@ impl<'a> Parser<'a> {
             ParserErrorContext::ExpectedRightBraceAfterClassBody,
         )?;
 
-        Ok(Stmt::Class(StmtClass::new(name, methods)))
+        Ok(Stmt::Class(StmtClass::new(name, superclass, methods)))
     }
 
     fn var_declaration(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
@@ -575,6 +587,16 @@ impl<'a> Parser<'a> {
                 return Ok(Expr::Grouping(ExprGrouping::new(Box::new(expr))));
             }
             TokenType::This => Ok(Expr::This(ExprThis::new(token))),
+            TokenType::Super => {
+                let keyword = self.tokenstream.previous()?;
+                self.tokenstream
+                    .consume(&TokenType::Dot, ParserErrorContext::ExpectedDotAfterSuper)?;
+                let method = self.tokenstream.consume(
+                    &TokenType::Ident,
+                    ParserErrorContext::ExpectedSuperclassMethodName,
+                )?;
+                Ok(Expr::Super(ExprSuper::new(keyword, method)))
+            }
             TokenType::Ident => Ok(Expr::Variable(ExprVariable::new(token))),
             _ => Err(ParserError::UnexpectedToken { token }),
         }

@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 use crate::lex::Token;
 
 use super::{
-    callable::{LoxCallable, LoxFunction},
+    callable::{CallType, LoxCallable, LoxFunction},
     error::{ClassError, RuntimeError},
     value::Value,
 };
@@ -11,16 +11,33 @@ use super::{
 #[derive(Debug, Clone)]
 pub struct LoxClass<'a> {
     pub name: &'a str,
+    pub superclass: Option<Rc<LoxClass<'a>>>,
     pub methods: HashMap<&'a str, LoxFunction<'a>>,
 }
 
 impl<'a> LoxClass<'a> {
-    pub fn new(name: &'a str, methods: HashMap<&'a str, LoxFunction<'a>>) -> Self {
-        Self { name, methods }
+    pub fn new(
+        name: &'a str,
+        superclass: Option<Rc<LoxClass<'a>>>,
+        methods: HashMap<&'a str, LoxFunction<'a>>,
+    ) -> Self {
+        Self {
+            name,
+            methods,
+            superclass,
+        }
     }
 
     pub fn find_method(&self, name: &str) -> Option<&LoxFunction<'a>> {
-        self.methods.get(name)
+        if self.methods.contains_key(name) {
+            return self.methods.get(name);
+        }
+
+        if let Some(superclass) = &self.superclass {
+            return superclass.find_method(name);
+        }
+
+        None
     }
 }
 
@@ -51,6 +68,14 @@ impl<'a> LoxCallable<'a> for LoxClass<'a> {
 
     fn to_string(&self) -> String {
         self.name.to_string()
+    }
+
+    fn call_type(&self) -> super::callable::CallType {
+        CallType::Class
+    }
+
+    fn clone_as_class(&self) -> Option<Rc<LoxClass<'a>>> {
+        Some(Rc::new(self.clone()))
     }
 }
 

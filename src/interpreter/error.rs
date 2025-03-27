@@ -61,6 +61,9 @@ pub enum ClassError<'a> {
 
     #[error("[line {}] Undefined property {}.", token.line, token.lexeme)]
     UndefinedProperty { token: Token<'a> },
+
+    #[error("[line {}] Superclass must be a class.", token.line)]
+    SuperclassNotAClass { token: Token<'a> },
 }
 
 #[derive(Error, Debug, PartialEq, PartialOrd, Clone)]
@@ -82,6 +85,15 @@ pub enum ResolverError<'a> {
 
     #[error("[line {}] Can't return a value from an initializer.", token.line)]
     ReturnInConstructor { token: Token<'a> },
+
+    #[error("[line {}] A class can't inherit from itself.", token.line)]
+    InheritanceCycle { token: Token<'a> },
+
+    #[error("[line {}] Can't use 'super' outside of a class.", token.line)]
+    SuperOutsideClass { token: Token<'a> },
+
+    #[error("[line {}] Can't use 'super' in a class with no superclass.", token.line)]
+    SuperInClassWithoutSuperclass { token: Token<'a> },
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
