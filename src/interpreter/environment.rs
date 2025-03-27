@@ -4,7 +4,7 @@ use crate::lex::Token;
 
 use super::{error::RuntimeError, Value};
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Environment<'a> {
     values: HashMap<&'a str, Option<Value<'a>>>,
     pub enclosing: Option<*mut Environment<'a>>,

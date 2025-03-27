@@ -4,7 +4,7 @@ use thiserror::Error;
 use crate::lex::Token;
 
 // TODO: Shard this into smaller domain rule-specific errors
-#[derive(Error, Debug, PartialEq, PartialOrd, Clone, EnumDiscriminants)]
+#[derive(Error, Debug, PartialEq, PartialOrd, EnumDiscriminants)]
 #[strum_discriminants(name(ParserErrorContext))]
 pub enum ParserError<'a> {
     #[error("[line {}] Error: Expected ')' after expression.", token.line)]
@@ -183,7 +183,7 @@ impl<'a> ParserErrorContext {
     }
 }
 
-#[derive(Error, Debug, PartialEq, PartialOrd, Clone, Copy)]
+#[derive(Error, Debug, PartialEq, PartialOrd)]
 pub enum TokenStreamError {
     #[error("Internal Parser Error")]
     OutOfBounds,

@@ -23,7 +23,7 @@ use crate::{
     lex::{Token, TokenType},
 };
 
-#[derive(Clone)]
+#[derive()]
 pub struct Interpreter<'a> {
     environment: *mut Environment<'a>,
     globals: Box<Environment<'a>>,

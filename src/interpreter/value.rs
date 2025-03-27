@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     cell::RefCell,
     fmt::{self},
     rc::Rc,
@@ -12,7 +13,7 @@ use std::ops::{Add, Div, Mul, Neg, Not, Sub};
 #[derive(Debug, Clone)]
 pub enum Value<'a> {
     Number(f64),
-    String(String),
+    String(Cow<'a, str>),
     Boolean(bool),
     Callable(Rc<dyn LoxCallable<'a>>),
     Instance(Rc<RefCell<LoxInstance<'a>>>),
@@ -70,7 +71,7 @@ impl<'a> Add for Value<'a> {
     fn add(self, rhs: Self) -> Self {
         match (self, rhs) {
             (Value::Number(l), Value::Number(r)) => Value::Number(l + r),
-            (Value::String(l), Value::String(r)) => Value::String(l + &r),
+            (Value::String(l), Value::String(r)) => Value::String(format!("{}{}", l, r).into()),
             _ => unreachable!(),
         }
     }
@@ -138,7 +139,7 @@ impl<'a> From<LiteralValue> for Value<'a> {
     fn from(literal: LiteralValue) -> Self {
         match literal {
             LiteralValue::F64(f) => Value::Number(f),
-            LiteralValue::String(s) => Value::String(s),
+            LiteralValue::String(s) => Value::String(Cow::Owned(s)),
             LiteralValue::Bool(b) => Value::Boolean(b),
             LiteralValue::Nil => Value::Nil,
         }
