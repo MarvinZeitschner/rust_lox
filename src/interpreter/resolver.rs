@@ -152,6 +152,11 @@ impl<'a, 'b: 'a> ExprVisitor<'a, 'b> for Resolver<'a> {
         Ok(())
     }
 
+    fn visit_super(&mut self, node: &'b ExprSuper<'a>) -> Self::Output {
+        self.resolve_local(Expr::Super(node.clone()), node.keyword);
+        Ok(())
+    }
+
     fn visit_this(&mut self, node: &'b ExprThis<'a>) -> Self::Output {
         if self.current_class == ClassType::None {
             return Err(ResolverError::ThisOutsideClass {
@@ -239,6 +244,11 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
             self.resolve_expr(superclass)?;
         }
 
+        if node.superclass.is_some() {
+            self.begin_scope();
+            self.scopes.last_mut().unwrap().insert("super", true);
+        }
+
         self.begin_scope();
         self.scopes.last_mut().unwrap().insert("this", true);
 
@@ -251,6 +261,10 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
         })?;
 
         self.end_scope();
+
+        if node.superclass.is_some() {
+            self.end_scope();
+        }
 
         self.current_class = enclosing_class;
 

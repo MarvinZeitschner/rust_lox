@@ -175,6 +175,45 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
         Ok(value)
     }
 
+    fn visit_super(&mut self, node: &'b ExprSuper<'a>) -> Self::Output {
+        let distance = self
+            .locals
+            .get(&Expr::Super(node.clone()))
+            .cloned()
+            .unwrap();
+
+        let superclass = self.get_mut_environment().get_at(distance, "super");
+        let object = self.get_mut_environment().get_at(distance - 1, "this");
+
+        let superclass = match superclass {
+            Value::Callable(callable) => callable.clone_as_class().ok_or(
+                RuntimeError::ClassError(ClassError::SuperclassNotAClass {
+                    token: node.keyword,
+                }),
+            )?,
+            _ => {
+                return Err(RuntimeError::ClassError(ClassError::SuperclassNotAClass {
+                    token: node.keyword,
+                }))
+            }
+        };
+
+        let object_instance = match object {
+            Value::Instance(instance) => instance.borrow().clone(), // Extract the actual LoxInstance
+            _ => {
+                panic!("Internal Error: 'this' is not an instance.");
+            }
+        };
+
+        let method = superclass
+            .find_method(node.method.lexeme)
+            .ok_or(RuntimeError::ClassError(ClassError::UndefinedProperty {
+                token: node.method,
+            }))?;
+
+        Ok(Value::Callable(Rc::new(method.bind(object_instance))))
+    }
+
     fn visit_this(&mut self, node: &'b ExprThis<'a>) -> Self::Output {
         // TODO: Clone
         self.lookup_variable(node.keyword, &Expr::This(node.clone()))
@@ -309,9 +348,10 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
 
     fn visit_class(&mut self, node: &'b StmtClass<'a>) -> Self::Output {
         let mut superclass = None;
+        let mut superclass_value = None;
         if let Some(sc) = &node.superclass {
-            let evaluated_superclass = self.evaluate(sc)?;
-            superclass = match evaluated_superclass {
+            superclass_value = Some(self.evaluate(sc)?);
+            superclass = match superclass_value.as_ref().unwrap() {
                 Value::Callable(callable) => {
                     let class = callable.clone_as_class().ok_or(RuntimeError::ClassError(
                         ClassError::SuperclassNotAClass { token: node.name },
@@ -324,6 +364,11 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
 
         self.get_mut_environment().define(node.name.lexeme, None);
 
+        if node.superclass.is_some() {
+            self.environment = Box::into_raw(Box::new(Environment::new(Some(self.environment))));
+            self.get_mut_environment().define("super", superclass_value);
+        }
+
         let mut methods = HashMap::new();
         node.methods.iter().for_each(|method| {
             let function = LoxFunction::new(
@@ -335,6 +380,11 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
         });
 
         let class = LoxClass::new(node.name.lexeme, superclass, methods);
+
+        if node.superclass.is_some() {
+            self.environment = self.get_mut_environment().enclosing.unwrap();
+        }
+
         self.get_mut_environment()
             .assign(node.name, Value::Callable(Rc::new(class)))?;
 
