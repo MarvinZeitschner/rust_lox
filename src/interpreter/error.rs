@@ -88,6 +88,12 @@ pub enum ResolverError<'a> {
 
     #[error("[line {}] A class can't inherit from itself.", token.line)]
     InheritanceCycle { token: Token<'a> },
+
+    #[error("[line {}] Can't use 'super' outside of a class.", token.line)]
+    SuperOutsideClass { token: Token<'a> },
+
+    #[error("[line {}] Can't use 'super' in a class with no superclass.", token.line)]
+    SuperInClassWithoutSuperclass { token: Token<'a> },
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]

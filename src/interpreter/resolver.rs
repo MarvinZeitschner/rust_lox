@@ -18,6 +18,7 @@ pub enum ClassType {
     #[default]
     None,
     Class,
+    Subclass,
 }
 
 #[derive(Default)]
@@ -153,6 +154,15 @@ impl<'a, 'b: 'a> ExprVisitor<'a, 'b> for Resolver<'a> {
     }
 
     fn visit_super(&mut self, node: &'b ExprSuper<'a>) -> Self::Output {
+        if self.current_class == ClassType::None {
+            return Err(ResolverError::SuperOutsideClass {
+                token: node.keyword,
+            });
+        } else if self.current_class != ClassType::Subclass {
+            return Err(ResolverError::SuperInClassWithoutSuperclass {
+                token: node.keyword,
+            });
+        }
         self.resolve_local(Expr::Super(node.clone()), node.keyword);
         Ok(())
     }
@@ -245,6 +255,7 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
         }
 
         if node.superclass.is_some() {
+            self.current_class = ClassType::Subclass;
             self.begin_scope();
             self.scopes.last_mut().unwrap().insert("super", true);
         }
