@@ -82,20 +82,19 @@ impl<'a> LoxCallable<'a> for LoxClass<'a> {
 #[derive(Clone)]
 pub struct LoxInstance<'a> {
     pub class: LoxClass<'a>,
-    pub fields: HashMap<&'a str, Value<'a>>,
+    pub fields: Rc<RefCell<HashMap<&'a str, Value<'a>>>>,
 }
 
 impl<'a> LoxInstance<'a> {
     pub fn new(class: LoxClass<'a>) -> Self {
         Self {
             class,
-            fields: HashMap::new(),
+            fields: Rc::new(RefCell::new(HashMap::new())),
         }
     }
 
     pub fn get(&self, name: Token<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
-        if let Some(value) = self.fields.get(name.lexeme) {
-            // TODO: Clone
+        if let Some(value) = self.fields.borrow().get(name.lexeme) {
             return Ok(value.clone());
         }
 
@@ -111,11 +110,7 @@ impl<'a> LoxInstance<'a> {
     }
 
     pub fn set(&mut self, name: Token<'a>, value: Value<'a>) {
-        if self.fields.contains_key(name.lexeme) {
-            self.fields.entry(name.lexeme).and_modify(|v| *v = value);
-        } else {
-            self.fields.insert(name.lexeme, value);
-        }
+        self.fields.borrow_mut().insert(name.lexeme, value);
     }
 }
 
