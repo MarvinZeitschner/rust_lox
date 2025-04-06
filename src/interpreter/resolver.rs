@@ -332,6 +332,10 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
             self.resolve_expr(expr)?;
         }
         self.define(&node.name);
+        if !self.scopes.is_empty() {
+            self.locals
+                .insert(Expr::Variable(ExprVariable { name: node.name }), 0);
+        }
         Ok(())
     }
 

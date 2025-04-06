@@ -1,4 +1,9 @@
-use std::{cell::RefCell, collections::VecDeque, fmt, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::VecDeque,
+    fmt,
+    rc::{Rc, Weak},
+};
 
 use crate::ast::StmtFunction;
 
@@ -40,14 +45,15 @@ impl<'a> fmt::Debug for dyn LoxCallable<'a> {
 #[derive(Debug, Clone)]
 pub struct LoxFunction<'a> {
     pub declaration: &'a StmtFunction<'a>,
-    pub closure: *mut Environment<'a>,
+    pub closure: Weak<RefCell<Environment<'a>>>,
     pub is_initializer: bool,
 }
 
 impl<'a: 'b, 'b> LoxFunction<'a> {
     pub fn new(
         declaration: &'a StmtFunction<'b>,
-        closure: *mut Environment<'a>,
+        // closure: *mut Environment<'a>,
+        closure: Weak<RefCell<Environment<'a>>>,
         is_initializer: bool,
     ) -> Self {
         Self {
@@ -57,25 +63,36 @@ impl<'a: 'b, 'b> LoxFunction<'a> {
         }
     }
     pub fn bind(&self, instance: LoxInstance<'a>) -> Self {
-        let mut environment = Environment::new(Some(self.closure));
-        environment.define(
+        let closure_env = self.closure.upgrade().map(|clos| Rc::downgrade(&clos));
+        let environment = Rc::new(RefCell::new(Environment::new(closure_env)));
+
+        environment.borrow_mut().define(
             "this",
             Some(Value::Instance(Rc::new(RefCell::new(instance)))),
         );
 
         Self {
             declaration: self.declaration,
-            closure: Box::into_raw(Box::new(environment)),
+            // closure: Box::into_raw(Box::new(environment)),
+            closure: Rc::downgrade(&environment),
             is_initializer: self.is_initializer,
         }
     }
 
     pub fn bind_rc(&self, instance: Rc<RefCell<LoxInstance<'a>>>) -> Self {
-        let mut environment = Environment::new(Some(self.closure));
-        environment.define("this", Some(Value::Instance(instance)));
+        // let mut environment = Environment::new(Some(self.closure));
+        // environment.define("this", Some(Value::Instance(instance)));
+
+        let closure_env = self.closure.upgrade().map(|clos| Rc::downgrade(&clos));
+        let environment = Rc::new(RefCell::new(Environment::new(closure_env)));
+
+        environment
+            .borrow_mut()
+            .define("this", Some(Value::Instance(instance)));
+
         Self {
             declaration: self.declaration,
-            closure: Box::into_raw(Box::new(environment)),
+            closure: Rc::downgrade(&environment),
             is_initializer: self.is_initializer,
         }
     }
@@ -87,7 +104,13 @@ impl<'a> LoxCallable<'a> for LoxFunction<'a> {
         interpreter: &mut Interpreter<'a>,
         mut arguments: VecDeque<Value<'a>>,
     ) -> Result<Value<'a>, RuntimeError<'a>> {
-        let mut environment = Environment::new(Some(self.closure));
+        // let mut environment = Environment::new(Some(self.closure));
+        let closure_env = match self.closure.upgrade() {
+            Some(env) => Some(Rc::downgrade(&env)),
+            None => return Err(RuntimeError::EnvironmentCreationError),
+        };
+
+        let environment = Rc::new(RefCell::new(Environment::new(closure_env)));
 
         for i in 0..self.declaration.params.len() {
             let lexeme = &self
@@ -99,7 +122,7 @@ impl<'a> LoxCallable<'a> for LoxFunction<'a> {
 
             let argument = arguments.pop_front().ok_or(CallableError::InternalError)?;
 
-            environment.define(lexeme, Some(argument));
+            environment.borrow_mut().define(lexeme, Some(argument));
         }
 
         let res = match interpreter.execute_block(&self.declaration.body, environment) {
@@ -107,10 +130,10 @@ impl<'a> LoxCallable<'a> for LoxFunction<'a> {
             Err(err) => match err {
                 RuntimeError::Return(value) => {
                     if self.is_initializer {
-                        unsafe {
-                            let mut closure = Box::from_raw(self.closure);
-                            return Ok(closure.get_at(0, "this"));
+                        if let Some(closure) = self.closure.upgrade() {
+                            return Ok(closure.borrow().get_at(0, "this"));
                         }
+                        return Err(RuntimeError::EnvironmentCreationError);
                     }
                     Ok(value.value)
                 }
@@ -119,10 +142,10 @@ impl<'a> LoxCallable<'a> for LoxFunction<'a> {
         };
 
         if self.is_initializer {
-            unsafe {
-                let mut closure = Box::from_raw(self.closure);
-                return Ok(closure.get_at(0, "this"));
+            if let Some(closure) = self.closure.upgrade() {
+                return Ok(closure.borrow().get_at(0, "this"));
             }
+            return Err(RuntimeError::EnvironmentCreationError);
         }
 
         res

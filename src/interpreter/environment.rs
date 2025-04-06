@@ -1,4 +1,8 @@
-use std::collections::HashMap;
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    rc::{Rc, Weak},
+};
 
 use crate::lex::Token;
 
@@ -7,11 +11,11 @@ use super::{error::RuntimeError, Value};
 #[derive(Clone, Debug)]
 pub struct Environment<'a> {
     values: HashMap<&'a str, Option<Value<'a>>>,
-    pub enclosing: Option<*mut Environment<'a>>,
+    pub enclosing: Option<Weak<RefCell<Environment<'a>>>>,
 }
 
 impl<'a> Environment<'a> {
-    pub fn new(enclosing: Option<*mut Environment<'a>>) -> Self {
+    pub fn new(enclosing: Option<Weak<RefCell<Environment<'a>>>>) -> Self {
         Self {
             values: HashMap::new(),
             enclosing,
@@ -32,33 +36,77 @@ impl<'a> Environment<'a> {
                 Some(value) => Ok(value.clone()),
                 None => Ok(Value::Nil),
             },
-            None => match self.enclosing {
-                Some(enclosing) => unsafe { return (*enclosing).get(name) },
-                _ => Err(RuntimeError::UndefinedVariable { name }),
+            None => match &self.enclosing {
+                Some(enclosing) => match enclosing.upgrade() {
+                    Some(enc) => enc.borrow().get(name),
+                    None => Err(RuntimeError::UndefinedVariable { name }),
+                },
+                None => Err(RuntimeError::UndefinedVariable { name }),
             },
         }
     }
 
-    pub fn get_at(&mut self, distance: usize, name: &'a str) -> Value<'a> {
-        // The Resolver already found the variable before, so we know it's there
-        self.ancestor(distance)
-            .values
-            .get(name)
-            .expect("AAAA")
-            .clone()
-            .expect("BBBB")
+    pub fn get_at(&self, distance: usize, name: &'a str) -> Value<'a> {
+        let env = self.ancestor(distance);
+
+        match env {
+            Some(env) => env
+                .borrow()
+                .values
+                .get(name)
+                .unwrap_or_else(|| panic!("Variable '{}' not found at distance {}", name, distance))
+                .clone()
+                .unwrap_or_else(|| panic!("Variable '{}' is None at distance {}", name, distance)),
+
+            None => self
+                .values
+                .get(name)
+                .unwrap_or_else(|| panic!("Variable '{}' not found at distance {}", name, distance))
+                .clone()
+                .unwrap_or_else(|| panic!("Variable '{}' is None at distance {}", name, distance)),
+        }
     }
 
     pub fn assign_at(&mut self, distance: usize, name: Token<'a>, value: Value<'a>) {
-        self.ancestor(distance).define(name.lexeme, Some(value));
+        let env = self.ancestor(distance);
+
+        match env {
+            Some(env) => env.borrow_mut().define(name.lexeme, Some(value)),
+            None => self.define(name.lexeme, Some(value)),
+        }
     }
 
-    fn ancestor(&mut self, distance: usize) -> &mut Environment<'a> {
-        let mut environment = self;
-        for _ in 0..distance {
-            environment = unsafe { &mut (*environment.enclosing.unwrap()) };
+    fn ancestor(&self, distance: usize) -> Option<Rc<RefCell<Environment<'a>>>> {
+        if distance == 0 {
+            return None;
         }
-        environment
+
+        let mut environment = match &self.enclosing {
+            Some(enc) => enc.upgrade().unwrap_or_else(|| {
+                panic!(
+                    "Environment was dropped (looking for distance {})",
+                    distance
+                )
+            }),
+            None => panic!(
+                "Ancestor lookup failed: no enclosing environment (looking for distance {})",
+                distance
+            ),
+        };
+
+        for i in 0..distance {
+            let next_env = match &environment.borrow().enclosing {
+                Some(enc) => enc.upgrade().unwrap_or_else(|| panic!("Environment was dropped (looking for distance {}, current: {})",
+                     distance, i)),
+                None => panic!(
+                    "Ancestor lookup failed: environment chain too short (looking for distance {}, current: {})",
+                     distance, i
+                ),
+            };
+            environment = next_env;
+        }
+
+        Some(environment)
     }
 
     pub fn assign(&mut self, name: Token<'a>, value: Value<'a>) -> Result<(), RuntimeError<'a>> {
@@ -69,8 +117,11 @@ impl<'a> Environment<'a> {
                     .and_modify(|v| *v = Some(value));
                 Ok(())
             }
-            false => match self.enclosing {
-                Some(enclosing) => unsafe { (*enclosing).assign(name, value) },
+            false => match &self.enclosing {
+                Some(enclosing) => match enclosing.upgrade() {
+                    Some(enc) => enc.borrow_mut().assign(name, value),
+                    None => Err(RuntimeError::UndefinedVariable { name }),
+                },
                 _ => Err(RuntimeError::UndefinedVariable { name }),
             },
         }
