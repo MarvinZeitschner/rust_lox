@@ -105,10 +105,7 @@ impl<'a> LoxCallable<'a> for LoxFunction<'a> {
         mut arguments: VecDeque<Value<'a>>,
     ) -> Result<Value<'a>, RuntimeError<'a>> {
         // let mut environment = Environment::new(Some(self.closure));
-        let closure_env = match self.closure.upgrade() {
-            Some(env) => Some(Rc::downgrade(&env)),
-            None => return Err(RuntimeError::EnvironmentCreationError),
-        };
+        let closure_env = self.closure.upgrade().map(|env| Rc::downgrade(&env));
 
         let environment = Rc::new(RefCell::new(Environment::new(closure_env)));
 
