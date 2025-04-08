@@ -94,7 +94,7 @@ impl<'a> Environment<'a> {
             ),
         };
 
-        for i in 0..distance {
+        for i in 1..distance {
             let next_env = match &environment.borrow().enclosing {
                 Some(enc) => enc.upgrade().unwrap_or_else(|| panic!("Environment was dropped (looking for distance {}, current: {})",
                      distance, i)),
