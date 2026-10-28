@@ -7,6 +7,7 @@ pub mod resolver;
 pub mod value;
 
 use std::{
+    cell::RefCell,
     collections::{HashMap, VecDeque},
     rc::Rc,
 };
@@ -25,36 +26,23 @@ use crate::{
 
 #[derive(Clone)]
 pub struct Interpreter<'a> {
-    environment: *mut Environment<'a>,
-    globals: Box<Environment<'a>>,
+    environment: Rc<RefCell<Environment<'a>>>,
+    globals: Rc<RefCell<Environment<'a>>>,
     locals: HashMap<Expr<'a>, usize>,
 }
 
 impl<'a, 'b: 'a> Interpreter<'a> {
     pub fn new(locals: HashMap<Expr<'a>, usize>) -> Self {
-        let mut globals = Box::new(Environment::new(None));
-        globals.define("clock", Some(Value::Callable(Rc::new(Clock::new()))));
-
-        let globals_ptr = &mut *globals as *mut Environment;
+        let globals = Rc::new(RefCell::new(Environment::new(None)));
+        globals
+            .borrow_mut()
+            .define("clock", Some(Value::Callable(Rc::new(Clock::new()))));
 
         Interpreter {
+            environment: globals.clone(),
             globals,
-            environment: globals_ptr,
             locals,
         }
-    }
-
-    fn get_mut_environment(&mut self) -> &mut Environment<'a> {
-        unsafe { &mut *self.environment }
-    }
-
-    #[allow(dead_code)]
-    fn get_environment(&self) -> &Environment<'a> {
-        unsafe { &*self.environment }
-    }
-
-    fn get_ptr_environment(&mut self) -> *mut Environment<'a> {
-        self.environment
     }
 
     pub fn interpret(&mut self, stmts: &'b [Stmt<'a>]) -> Result<(), RuntimeError<'a>> {
@@ -71,27 +59,12 @@ impl<'a, 'b: 'a> Interpreter<'a> {
         statements: &'b [Stmt<'a>],
         environment: Environment<'a>,
     ) -> Result<(), RuntimeError<'a>> {
-        // I will leaves this here as it was a cool approach before the need of Rc's and now raw
-        // pointers
-        // std::mem::swap(&mut self.environment, &mut environment);
-        //
-        // let result = statements.iter().try_for_each(|stmt| self.execute(stmt));
-        //
-        // if let Some(enclosing) = self.environment.enclosing.take() {
-        //     self.environment = *enclosing;
-        // }
-        //
-        // result
-
-        let prev = self.environment;
-
-        let env_ptr = Box::into_raw(Box::new(environment));
-
-        self.environment = env_ptr;
+        // The block's environment is dropped once nothing references it anymore. Closures
+        // created inside the block keep it alive through their own Rc.
+        let prev = std::mem::replace(&mut self.environment, Rc::new(RefCell::new(environment)));
 
         let result = statements.iter().try_for_each(|stmt| self.execute(stmt));
 
-        let _drop = Box::from(env_ptr);
         self.environment = prev;
 
         result
@@ -131,8 +104,8 @@ impl<'a, 'b: 'a> Interpreter<'a> {
     ) -> Result<Value<'a>, RuntimeError<'a>> {
         let distance = self.locals.get(expr);
         match distance {
-            Some(&d) => Ok(self.get_mut_environment().get_at(d, name.lexeme)),
-            None => self.globals.get(name),
+            Some(&d) => Ok(self.environment.borrow().get_at(d, name.lexeme)),
+            None => self.globals.borrow().get(name),
         }
     }
 }
@@ -182,8 +155,8 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
             .cloned()
             .unwrap();
 
-        let superclass = self.get_mut_environment().get_at(distance, "super");
-        let object = self.get_mut_environment().get_at(distance - 1, "this");
+        let superclass = self.environment.borrow().get_at(distance, "super");
+        let object = self.environment.borrow().get_at(distance - 1, "this");
 
         let superclass = match superclass {
             Value::Callable(callable) => callable.clone_as_class().ok_or(
@@ -326,10 +299,11 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
         let distance = self.locals.get(&Expr::Assign(node.clone())).cloned();
         match distance {
             Some(d) => {
-                self.get_mut_environment()
+                self.environment
+                    .borrow_mut()
                     .assign_at(d, node.name, value.clone());
             }
-            None => self.globals.assign(node.name, value.clone())?,
+            None => self.globals.borrow_mut().assign(node.name, value.clone())?,
         }
 
         Ok(value)
@@ -344,7 +318,10 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
     type Output = Result<(), RuntimeError<'a>>;
 
     fn visit_block(&mut self, node: &'b StmtBlock<'a>) -> Self::Output {
-        self.execute_block(&node.statements, Environment::new(Some(self.environment)))?;
+        self.execute_block(
+            &node.statements,
+            Environment::new(Some(self.environment.clone())),
+        )?;
         Ok(())
     }
 
@@ -364,18 +341,19 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
             };
         }
 
-        self.get_mut_environment().define(node.name.lexeme, None);
+        self.environment.borrow_mut().define(node.name.lexeme, None);
 
         if node.superclass.is_some() {
-            self.environment = Box::into_raw(Box::new(Environment::new(Some(self.environment))));
-            self.get_mut_environment().define("super", superclass_value);
+            let mut environment = Environment::new(Some(self.environment.clone()));
+            environment.define("super", superclass_value);
+            self.environment = Rc::new(RefCell::new(environment));
         }
 
         let mut methods = HashMap::new();
         node.methods.iter().for_each(|method| {
             let function = LoxFunction::new(
                 method,
-                self.get_ptr_environment(),
+                self.environment.clone(),
                 method.name.lexeme.eq("init"),
             );
             methods.insert(method.name.lexeme, function);
@@ -384,10 +362,12 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
         let class = LoxClass::new(node.name.lexeme, superclass, methods);
 
         if node.superclass.is_some() {
-            self.environment = self.get_mut_environment().enclosing.unwrap();
+            let enclosing = self.environment.borrow().enclosing.clone().unwrap();
+            self.environment = enclosing;
         }
 
-        self.get_mut_environment()
+        self.environment
+            .borrow_mut()
             .assign(node.name, Value::Callable(Rc::new(class)))?;
 
         Ok(())
@@ -399,9 +379,10 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
     }
 
     fn visit_function(&mut self, node: &'b StmtFunction<'a>) -> Self::Output {
-        let function = LoxFunction::new(node, self.get_ptr_environment(), false);
+        let function = LoxFunction::new(node, self.environment.clone(), false);
 
-        self.get_mut_environment()
+        self.environment
+            .borrow_mut()
             .define(node.name.lexeme, Some(Value::Callable(Rc::new(function))));
 
         Ok(())
@@ -439,7 +420,7 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
         if let Some(initializer) = &node.initializer {
             value = Some(self.evaluate(initializer)?);
         }
-        self.get_mut_environment().define(node.name.lexeme, value);
+        self.environment.borrow_mut().define(node.name.lexeme, value);
         Ok(())
     }
 

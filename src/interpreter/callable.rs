@@ -40,14 +40,14 @@ impl<'a> fmt::Debug for dyn LoxCallable<'a> {
 #[derive(Debug, Clone)]
 pub struct LoxFunction<'a> {
     pub declaration: &'a StmtFunction<'a>,
-    pub closure: *mut Environment<'a>,
+    pub closure: Rc<RefCell<Environment<'a>>>,
     pub is_initializer: bool,
 }
 
 impl<'a: 'b, 'b> LoxFunction<'a> {
     pub fn new(
         declaration: &'a StmtFunction<'b>,
-        closure: *mut Environment<'a>,
+        closure: Rc<RefCell<Environment<'a>>>,
         is_initializer: bool,
     ) -> Self {
         Self {
@@ -57,25 +57,15 @@ impl<'a: 'b, 'b> LoxFunction<'a> {
         }
     }
     pub fn bind(&self, instance: LoxInstance<'a>) -> Self {
-        let mut environment = Environment::new(Some(self.closure));
-        environment.define(
-            "this",
-            Some(Value::Instance(Rc::new(RefCell::new(instance)))),
-        );
-
-        Self {
-            declaration: self.declaration,
-            closure: Box::into_raw(Box::new(environment)),
-            is_initializer: self.is_initializer,
-        }
+        self.bind_rc(Rc::new(RefCell::new(instance)))
     }
 
     pub fn bind_rc(&self, instance: Rc<RefCell<LoxInstance<'a>>>) -> Self {
-        let mut environment = Environment::new(Some(self.closure));
+        let mut environment = Environment::new(Some(self.closure.clone()));
         environment.define("this", Some(Value::Instance(instance)));
         Self {
             declaration: self.declaration,
-            closure: Box::into_raw(Box::new(environment)),
+            closure: Rc::new(RefCell::new(environment)),
             is_initializer: self.is_initializer,
         }
     }
@@ -87,7 +77,7 @@ impl<'a> LoxCallable<'a> for LoxFunction<'a> {
         interpreter: &mut Interpreter<'a>,
         mut arguments: VecDeque<Value<'a>>,
     ) -> Result<Value<'a>, RuntimeError<'a>> {
-        let mut environment = Environment::new(Some(self.closure));
+        let mut environment = Environment::new(Some(self.closure.clone()));
 
         for i in 0..self.declaration.params.len() {
             let lexeme = &self
@@ -107,10 +97,7 @@ impl<'a> LoxCallable<'a> for LoxFunction<'a> {
             Err(err) => match err {
                 RuntimeError::Return(value) => {
                     if self.is_initializer {
-                        unsafe {
-                            let mut closure = Box::from_raw(self.closure);
-                            return Ok(closure.get_at(0, "this"));
-                        }
+                        return Ok(self.closure.borrow().get_at(0, "this"));
                     }
                     Ok(value.value)
                 }
@@ -119,10 +106,7 @@ impl<'a> LoxCallable<'a> for LoxFunction<'a> {
         };
 
         if self.is_initializer {
-            unsafe {
-                let mut closure = Box::from_raw(self.closure);
-                return Ok(closure.get_at(0, "this"));
-            }
+            return Ok(self.closure.borrow().get_at(0, "this"));
         }
 
         res

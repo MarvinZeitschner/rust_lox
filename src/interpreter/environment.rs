@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::lex::Token;
 
@@ -7,11 +7,11 @@ use super::{error::RuntimeError, Value};
 #[derive(Clone, Debug)]
 pub struct Environment<'a> {
     values: HashMap<&'a str, Option<Value<'a>>>,
-    pub enclosing: Option<*mut Environment<'a>>,
+    pub enclosing: Option<Rc<RefCell<Environment<'a>>>>,
 }
 
 impl<'a> Environment<'a> {
-    pub fn new(enclosing: Option<*mut Environment<'a>>) -> Self {
+    pub fn new(enclosing: Option<Rc<RefCell<Environment<'a>>>>) -> Self {
         Self {
             values: HashMap::new(),
             enclosing,
@@ -19,11 +19,7 @@ impl<'a> Environment<'a> {
     }
 
     pub fn define(&mut self, name: &'a str, value: Option<Value<'a>>) {
-        if self.values.contains_key(name) {
-            self.values.entry(name).and_modify(|v| *v = value);
-        } else {
-            self.values.insert(name, value);
-        }
+        self.values.insert(name, value);
     }
 
     pub fn get(&self, name: Token<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
@@ -32,45 +28,57 @@ impl<'a> Environment<'a> {
                 Some(value) => Ok(value.clone()),
                 None => Ok(Value::Nil),
             },
-            None => match self.enclosing {
-                Some(enclosing) => unsafe { return (*enclosing).get(name) },
+            None => match &self.enclosing {
+                Some(enclosing) => enclosing.borrow().get(name),
                 _ => Err(RuntimeError::UndefinedVariable { name }),
             },
         }
     }
 
-    pub fn get_at(&mut self, distance: usize, name: &'a str) -> Value<'a> {
+    pub fn get_at(&self, distance: usize, name: &'a str) -> Value<'a> {
         // The Resolver already found the variable before, so we know it's there
-        self.ancestor(distance)
-            .values
-            .get(name)
-            .expect("AAAA")
-            .clone()
-            .expect("BBBB")
+        let get = |env: &Environment<'a>| {
+            env.values
+                .get(name)
+                .expect("AAAA")
+                .clone()
+                .expect("BBBB")
+        };
+
+        match distance {
+            0 => get(self),
+            _ => get(&self.ancestor(distance).borrow()),
+        }
     }
 
     pub fn assign_at(&mut self, distance: usize, name: Token<'a>, value: Value<'a>) {
-        self.ancestor(distance).define(name.lexeme, Some(value));
+        match distance {
+            0 => self.define(name.lexeme, Some(value)),
+            _ => self
+                .ancestor(distance)
+                .borrow_mut()
+                .define(name.lexeme, Some(value)),
+        }
     }
 
-    fn ancestor(&mut self, distance: usize) -> &mut Environment<'a> {
-        let mut environment = self;
-        for _ in 0..distance {
-            environment = unsafe { &mut (*environment.enclosing.unwrap()) };
+    /// Returns the environment `distance` hops up the chain. `distance` must be at least 1.
+    fn ancestor(&self, distance: usize) -> Rc<RefCell<Environment<'a>>> {
+        let mut environment = self.enclosing.clone().unwrap();
+        for _ in 1..distance {
+            let enclosing = environment.borrow().enclosing.clone().unwrap();
+            environment = enclosing;
         }
         environment
     }
 
     pub fn assign(&mut self, name: Token<'a>, value: Value<'a>) -> Result<(), RuntimeError<'a>> {
-        match self.values.contains_key(name.lexeme) {
-            true => {
-                self.values
-                    .entry(name.lexeme)
-                    .and_modify(|v| *v = Some(value));
+        match self.values.get_mut(name.lexeme) {
+            Some(v) => {
+                *v = Some(value);
                 Ok(())
             }
-            false => match self.enclosing {
-                Some(enclosing) => unsafe { (*enclosing).assign(name, value) },
+            None => match &self.enclosing {
+                Some(enclosing) => enclosing.borrow_mut().assign(name, value),
                 _ => Err(RuntimeError::UndefinedVariable { name }),
             },
         }
