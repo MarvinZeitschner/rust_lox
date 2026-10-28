@@ -83,11 +83,25 @@ impl<'a> TokenStream<'a> {
 
 pub struct Parser<'a> {
     tokenstream: TokenStream<'a>,
+    had_error: bool,
 }
 
 impl<'a> Parser<'a> {
     pub fn new(tokenstream: TokenStream<'a>) -> Self {
-        Self { tokenstream }
+        Self {
+            tokenstream,
+            had_error: false,
+        }
+    }
+
+    /// Whether an error was reported that didn't abort parsing (e.g. too many parameters).
+    pub fn had_error(&self) -> bool {
+        self.had_error
+    }
+
+    fn report(&mut self, err: ParserError<'a>) {
+        eprintln!("{}", err);
+        self.had_error = true;
     }
 
     pub fn parse(&mut self) -> Result<Vec<Stmt<'a>>, ParserError<'a>> {
@@ -354,8 +368,7 @@ impl<'a> Parser<'a> {
         if !self.tokenstream.check(&TokenType::RightParen)? {
             if parameters.len() >= 255 {
                 let token = self.tokenstream.peek()?;
-                let err = ParserError::TooManyFunctionParameters { token: *token };
-                eprintln!("{}", err);
+                self.report(ParserError::TooManyFunctionParameters { token: *token });
             }
             parameters.push(
                 self.tokenstream
@@ -365,8 +378,7 @@ impl<'a> Parser<'a> {
             while self.tokenstream.match_l(&[TokenType::Comma])? {
                 if parameters.len() >= 255 {
                     let token = self.tokenstream.peek()?;
-                    let err = ParserError::TooManyFunctionParameters { token: *token };
-                    eprintln!("{}", err);
+                    self.report(ParserError::TooManyFunctionParameters { token: *token });
                 }
                 parameters.push(
                     self.tokenstream
@@ -418,16 +430,14 @@ impl<'a> Parser<'a> {
         if !self.tokenstream.check(&TokenType::RightParen)? {
             if arguments.len() >= 255 {
                 let token = self.tokenstream.peek()?;
-                let err = ParserError::TooManyFunctionArguments { token: *token };
-                eprintln!("{}", err);
+                self.report(ParserError::TooManyFunctionArguments { token: *token });
             }
             arguments.push(self.expression()?);
 
             while self.tokenstream.match_l(&[TokenType::Comma])? {
                 if arguments.len() >= 255 {
                     let token = self.tokenstream.peek()?;
-                    let err = ParserError::TooManyFunctionArguments { token: *token };
-                    eprintln!("{}", err);
+                    self.report(ParserError::TooManyFunctionArguments { token: *token });
                 }
                 arguments.push(self.expression()?);
             }

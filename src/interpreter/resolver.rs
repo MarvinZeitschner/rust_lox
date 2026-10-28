@@ -39,8 +39,23 @@ impl<'a, 'b: 'a> Resolver<'a> {
         }
     }
 
-    pub fn resolve(&mut self, stmts: &'b [Stmt<'a>]) -> Result<(), ResolverError<'a>> {
-        stmts.iter().try_for_each(|stmt| self.resolve_stmt(stmt))
+    /// Resolves all statements and collects one error per failing top-level statement.
+    pub fn resolve(&mut self, stmts: &'b [Stmt<'a>]) -> Result<(), Vec<ResolverError<'a>>> {
+        let mut errors = vec![];
+        for stmt in stmts {
+            if let Err(err) = self.resolve_stmt(stmt) {
+                errors.push(err);
+                // The error aborted the statement midway, so return to the top-level state
+                self.scopes.clear();
+                self.current_function = FunctionType::None;
+                self.current_class = ClassType::None;
+            }
+        }
+
+        match errors.is_empty() {
+            true => Ok(()),
+            false => Err(errors),
+        }
     }
 
     pub fn get_locals(self) -> HashMap<Expr<'a>, usize> {

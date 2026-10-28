@@ -32,7 +32,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut parser = parser::Parser::new(TokenStream::new(tokens));
     let stmts = parser.parse();
     let stmts = match stmts {
-        Ok(s) => s,
+        Ok(s) if !parser.had_error() => s,
+        Ok(_) => std::process::exit(65),
         Err(e) => {
             eprintln!("{e:#}");
             std::process::exit(65);
@@ -40,8 +41,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let mut resolver = Resolver::new();
-    if let Err(e) = resolver.resolve(&stmts) {
-        eprintln!("{e:#}");
+    if let Err(errors) = resolver.resolve(&stmts) {
+        errors.iter().for_each(|e| eprintln!("{e:#}"));
         std::process::exit(65);
     }
 
@@ -52,7 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(_) => Ok(()),
         Err(e) => {
             eprintln!("{e:#}");
-            std::process::exit(65);
+            std::process::exit(70);
         }
     }
 }

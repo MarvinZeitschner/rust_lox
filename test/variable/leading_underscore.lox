@@ -1,0 +1,15 @@
+var _a = "global";
+print _a; // expect: global
+
+{
+  var _b = "local";
+  print _b; // expect: local
+}
+
+fun _f(_p) { return _p; }
+print _f("param"); // expect: param
+
+class _C {
+  _m() { return "method"; }
+}
+print _C()._m(); // expect: method

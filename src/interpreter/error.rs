@@ -9,13 +9,13 @@ pub enum RuntimeError<'a> {
     #[error("[line {}] Operand must be a number.", operator.line)]
     NumberOperand { operator: Token<'a> },
 
-    #[error("[line {}] Operands must be a number.", operator.line)]
+    #[error("[line {}] Operands must be numbers.", operator.line)]
     MutlipleNumberOperands { operator: Token<'a> },
 
     #[error("[line {}] Operands must be two numbers or two strings.", operator.line)]
     NumberOrStringOperands { operator: Token<'a> },
 
-    #[error("[line {}] Undefined Variable '{}'.", name.line, name.lexeme)]
+    #[error("[line {}] Undefined variable '{}'.", name.line, name.lexeme)]
     UndefinedVariable { name: Token<'a> },
 
     #[error("[line {}] Can only call functions and classes.", token.line)]
@@ -62,7 +62,10 @@ pub enum ClassError<'a> {
     #[error("[line {}] Only instances have properties.", token.line)]
     InvalidPropertyAccess { token: Token<'a> },
 
-    #[error("[line {}] Undefined property {}.", token.line, token.lexeme)]
+    #[error("[line {}] Only instances have fields.", token.line)]
+    InvalidFieldAccess { token: Token<'a> },
+
+    #[error("[line {}] Undefined property '{}'.", token.line, token.lexeme)]
     UndefinedProperty { token: Token<'a> },
 
     #[error("[line {}] Superclass must be a class.", token.line)]
@@ -77,7 +80,7 @@ pub enum ResolverError<'a> {
     #[error("Internal Error")]
     InternalResolverError,
 
-    #[error("[line {}] Already a variable with this name in this scope.", token.line)]
+    #[error("[line {}] Already a variable with this name in this scope.", token.line)]
     SameNameVariableInLocalScope { token: Token<'a> },
 
     #[error("[line {}] Can't return from top-level code.", token.line)]

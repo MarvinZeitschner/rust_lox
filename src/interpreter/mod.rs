@@ -145,9 +145,9 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
         let object = self.evaluate(&node.object)?;
 
         let Value::Instance(instance) = object else {
-            return Err(RuntimeError::ClassError(
-                ClassError::InvalidPropertyAccess { token: node.name },
-            ));
+            return Err(RuntimeError::ClassError(ClassError::InvalidFieldAccess {
+                token: node.name,
+            }));
         };
 
         let value = self.evaluate(&node.value)?;
@@ -345,7 +345,11 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
                     ))?;
                     Some(class)
                 }
-                _ => None,
+                _ => {
+                    return Err(RuntimeError::ClassError(
+                        ClassError::SuperclassNotAClass { token: node.name },
+                    ))
+                }
             };
         }
 

@@ -282,9 +282,10 @@ impl<'a> Scanner<'a> {
             self.read_char();
         }
 
-        self.peek().ok_or(TokenError::NonTerminatedString(
-            self.source[self.start..self.position].to_string(),
-        ))?;
+        self.peek().ok_or(TokenError::NonTerminatedString {
+            line: self.line,
+            string: self.source[self.start..self.position].to_string(),
+        })?;
 
         self.read_char();
 
@@ -377,8 +378,13 @@ impl<'a> Scanner<'a> {
             '/' => self.make_token(TokenType::Slash),
             '"' => self.string()?,
             c if c.is_ascii_digit() => self.number(),
-            c if c.is_alphabetic() => self.identifier(),
-            _ => return Err(TokenError::UnexpectedToken(c.to_string())),
+            c if c.is_alphabetic() || c == '_' => self.identifier(),
+            _ => {
+                return Err(TokenError::UnexpectedToken {
+                    line: self.line,
+                    token: c.to_string(),
+                })
+            }
         };
 
         Ok(token)
@@ -454,7 +460,10 @@ mod test {
         let token = Token::new(TokenType::String, "test", 1, span);
         assert_eq!(token, scanner.scan_token().unwrap());
         assert_eq!(
-            Err(TokenError::NonTerminatedString("\"test".to_string())),
+            Err(TokenError::NonTerminatedString {
+                line: 1,
+                string: "\"test".to_string()
+            }),
             scanner.scan_token()
         );
     }
@@ -475,11 +484,25 @@ mod test {
     }
 
     #[test]
+    fn ident_leading_underscore() {
+        let mut scanner = Scanner::new("_ _test");
+        let mut span = Span { begin: 0, end: 1 };
+        let mut token = Token::new(TokenType::Ident, "_", 1, span);
+        assert_eq!(token, scanner.scan_token().unwrap());
+        span = Span { begin: 2, end: 7 };
+        token = Token::new(TokenType::Ident, "_test", 1, span);
+        assert_eq!(token, scanner.scan_token().unwrap());
+    }
+
+    #[test]
     fn err() {
         let input = "💣";
         let mut scanner = Scanner::new(input);
         assert_eq!(
-            Err(TokenError::UnexpectedToken("💣".to_string())),
+            Err(TokenError::UnexpectedToken {
+                line: 1,
+                token: "💣".to_string()
+            }),
             scanner.scan_token()
         );
     }
