@@ -10,5 +10,26 @@ strum = { version = "0.27.1", features = ["derive"] }
 ast_macro = { path = "ast_macro" }
 
 [dev-dependencies]
+criterion = { version = "0.8.2", features = ["html_reports"] }
 regex = "1.11.1"
 test-generator = "0.3.1"
+
+[profile.release]
+debug = true
+
+[profile.profiling]
+inherits = "release"
+debug = true
+
+[[bench]]
+name = "interpreter"
+harness = false
+
+# Keep `cargo bench` from running the libtest harness of the library and binary
+[lib]
+bench = false
+
+[[bin]]
+name = "rust_lox"
+path = "src/main.rs"
+bench = false

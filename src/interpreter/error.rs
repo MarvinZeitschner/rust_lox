@@ -31,6 +31,9 @@ pub enum RuntimeError<'a> {
     #[error("Internal Error: Error while creating environments.")]
     EnvironmentCreationError,
 
+    #[error("Failed to write output: {0}")]
+    Output(String),
+
     #[error("{0}")]
     CallableError(#[from] CallableError),
 

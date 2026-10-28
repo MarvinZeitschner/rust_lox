@@ -9,6 +9,7 @@ pub mod value;
 use std::{
     cell::RefCell,
     collections::{HashMap, VecDeque},
+    io::{self, Write},
     rc::Rc,
 };
 
@@ -24,15 +25,21 @@ use crate::{
     lex::{Token, TokenType},
 };
 
-#[derive(Clone)]
 pub struct Interpreter<'a> {
     environment: Rc<RefCell<Environment<'a>>>,
     globals: Rc<RefCell<Environment<'a>>>,
     locals: HashMap<Expr<'a>, usize>,
+    output: Box<dyn Write>,
 }
 
 impl<'a, 'b: 'a> Interpreter<'a> {
+    /// Creates an interpreter that prints to stdout.
     pub fn new(locals: HashMap<Expr<'a>, usize>) -> Self {
+        Self::with_output(locals, Box::new(io::stdout()))
+    }
+
+    /// Creates an interpreter that writes the output of `print` statements to `output`.
+    pub fn with_output(locals: HashMap<Expr<'a>, usize>, output: Box<dyn Write>) -> Self {
         let globals = Rc::new(RefCell::new(Environment::new(None)));
         globals
             .borrow_mut()
@@ -42,6 +49,7 @@ impl<'a, 'b: 'a> Interpreter<'a> {
             environment: globals.clone(),
             globals,
             locals,
+            output,
         }
     }
 
@@ -401,7 +409,7 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
 
     fn visit_print(&mut self, node: &StmtPrint<'a>) -> Self::Output {
         let value = self.evaluate(&node.expr)?;
-        println!("{}", value);
+        writeln!(self.output, "{}", value).map_err(|e| RuntimeError::Output(e.to_string()))?;
         Ok(())
     }
 
