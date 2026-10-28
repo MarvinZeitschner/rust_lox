@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, rc::Rc};
 
 use crate::interpreter::{callable::LoxCallable, error::RuntimeError, Interpreter, Value};
 
@@ -15,7 +15,7 @@ impl Clock {
 
 impl<'a> LoxCallable<'a> for Clock {
     fn call(
-        &self,
+        self: Rc<Self>,
         _interpreter: &mut Interpreter<'a>,
         _arguments: VecDeque<Value<'a>>,
     ) -> Result<Value<'a>, RuntimeError<'a>> {

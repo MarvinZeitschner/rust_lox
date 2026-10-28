@@ -16,8 +16,9 @@ pub enum CallType {
 }
 
 pub trait LoxCallable<'a>: 'a {
+    /// Takes `Rc<Self>` so that a class can hand out a reference to itself to its instances.
     fn call(
-        &self,
+        self: Rc<Self>,
         interpreter: &mut Interpreter<'a>,
         arguments: VecDeque<Value<'a>>,
     ) -> Result<Value<'a>, RuntimeError<'a>>;
@@ -26,7 +27,7 @@ pub trait LoxCallable<'a>: 'a {
     fn call_type(&self) -> CallType {
         CallType::Function
     }
-    fn clone_as_class(&self) -> Option<Rc<LoxClass<'a>>> {
+    fn as_class(self: Rc<Self>) -> Option<Rc<LoxClass<'a>>> {
         None
     }
 }
@@ -56,11 +57,7 @@ impl<'a: 'b, 'b> LoxFunction<'a> {
             is_initializer,
         }
     }
-    pub fn bind(&self, instance: LoxInstance<'a>) -> Self {
-        self.bind_rc(Rc::new(RefCell::new(instance)))
-    }
-
-    pub fn bind_rc(&self, instance: Rc<RefCell<LoxInstance<'a>>>) -> Self {
+    pub fn bind(&self, instance: Rc<RefCell<LoxInstance<'a>>>) -> Self {
         let mut environment = Environment::new(Some(self.closure.clone()));
         environment.define("this", Some(Value::Instance(instance)));
         Self {
@@ -69,10 +66,8 @@ impl<'a: 'b, 'b> LoxFunction<'a> {
             is_initializer: self.is_initializer,
         }
     }
-}
 
-impl<'a> LoxCallable<'a> for LoxFunction<'a> {
-    fn call(
+    pub fn invoke(
         &self,
         interpreter: &mut Interpreter<'a>,
         mut arguments: VecDeque<Value<'a>>,
@@ -92,24 +87,25 @@ impl<'a> LoxCallable<'a> for LoxFunction<'a> {
             environment.define(lexeme, Some(argument));
         }
 
-        let res = match interpreter.execute_block(&self.declaration.body, environment) {
-            Ok(_) => Ok(Value::Nil),
-            Err(err) => match err {
-                RuntimeError::Return(value) => {
-                    if self.is_initializer {
-                        return Ok(self.closure.borrow().get_at(0, "this"));
-                    }
-                    Ok(value.value)
-                }
-                _ => Err(err),
-            },
-        };
-
-        if self.is_initializer {
-            return Ok(self.closure.borrow().get_at(0, "this"));
+        match interpreter.execute_block(&self.declaration.body, environment) {
+            // An initializer always returns `this`, even after an early `return;`
+            Ok(()) | Err(RuntimeError::Return(_)) if self.is_initializer => {
+                Ok(self.closure.borrow().get_at(0, "this"))
+            }
+            Ok(()) => Ok(Value::Nil),
+            Err(RuntimeError::Return(value)) => Ok(value.value),
+            Err(err) => Err(err),
         }
+    }
+}
 
-        res
+impl<'a> LoxCallable<'a> for LoxFunction<'a> {
+    fn call(
+        self: Rc<Self>,
+        interpreter: &mut Interpreter<'a>,
+        arguments: VecDeque<Value<'a>>,
+    ) -> Result<Value<'a>, RuntimeError<'a>> {
+        self.invoke(interpreter, arguments)
     }
 
     fn arity(&self) -> usize {

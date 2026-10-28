@@ -14,7 +14,7 @@ use std::{
 };
 
 use callable::LoxFunction;
-use class::LoxClass;
+use class::{LoxClass, LoxInstance};
 use environment::Environment;
 use error::{ClassError, Return, RuntimeError};
 use native_fun::clock::Clock;
@@ -167,7 +167,7 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
         let object = self.environment.borrow().get_at(distance - 1, "this");
 
         let superclass = match superclass {
-            Value::Callable(callable) => callable.clone_as_class().ok_or(
+            Value::Callable(callable) => callable.as_class().ok_or(
                 RuntimeError::ClassError(ClassError::SuperclassNotAClass {
                     token: node.keyword,
                 }),
@@ -193,8 +193,7 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
                 token: node.method,
             }))?;
 
-        let a = method.bind_rc(object);
-        Ok(Value::Callable(Rc::new(a)))
+        Ok(Value::Callable(Rc::new(method.bind(object))))
     }
 
     fn visit_this(&mut self, node: &'b ExprThis<'a>) -> Self::Output {
@@ -293,7 +292,7 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
         let object = self.evaluate(&node.object)?;
 
         if let Value::Instance(instance) = object {
-            return instance.borrow().get(node.name);
+            return LoxInstance::get(&instance, node.name);
         }
 
         Err(RuntimeError::ClassError(
@@ -340,7 +339,7 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
             superclass_value = Some(self.evaluate(sc)?);
             superclass = match superclass_value.as_ref().unwrap() {
                 Value::Callable(callable) => {
-                    let class = callable.clone_as_class().ok_or(RuntimeError::ClassError(
+                    let class = callable.clone().as_class().ok_or(RuntimeError::ClassError(
                         ClassError::SuperclassNotAClass { token: node.name },
                     ))?;
                     Some(class)

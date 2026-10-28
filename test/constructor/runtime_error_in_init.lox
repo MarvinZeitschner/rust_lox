@@ -1,0 +1,8 @@
+class Foo {
+  init() {
+    this.value = 1 + nil; // expect runtime error: Operands must be two numbers or two strings.
+  }
+}
+
+Foo();
+print "unreachable";

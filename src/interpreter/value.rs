@@ -117,6 +117,7 @@ impl<'a> PartialEq for Value<'a> {
             (Value::Boolean(l), Value::Boolean(r)) => l == r,
             (Value::Nil, Value::Nil) => true,
             (Value::Callable(l), Value::Callable(r)) => Rc::ptr_eq(l, r),
+            (Value::Instance(l), Value::Instance(r)) => Rc::ptr_eq(l, r),
             _ => false,
         }
     }

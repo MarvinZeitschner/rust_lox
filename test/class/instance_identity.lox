@@ -1,0 +1,17 @@
+class Foo {
+  me() { return this; }
+}
+
+var a = Foo();
+var b = Foo();
+
+print a == a; // expect: true
+print a == b; // expect: false
+print a != b; // expect: true
+
+// `this` inside a method is the very same instance, not a copy
+print a.me() == a; // expect: true
+print a.me() == b; // expect: false
+
+var alias = a;
+print alias == a; // expect: true

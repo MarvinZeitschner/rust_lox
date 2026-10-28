@@ -8,7 +8,7 @@ use super::{
     value::Value,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct LoxClass<'a> {
     pub name: &'a str,
     pub superclass: Option<Rc<LoxClass<'a>>>,
@@ -43,19 +43,19 @@ impl<'a> LoxClass<'a> {
 
 impl<'a> LoxCallable<'a> for LoxClass<'a> {
     fn call(
-        &self,
+        self: Rc<Self>,
         interpreter: &mut super::Interpreter<'a>,
         arguments: std::collections::VecDeque<super::value::Value<'a>>,
     ) -> Result<super::value::Value<'a>, super::error::RuntimeError<'a>> {
-        let instance_rc = Rc::new(RefCell::new(LoxInstance::new(self.clone())));
+        let instance = Rc::new(RefCell::new(LoxInstance::new(self.clone())));
 
         if let Some(initializer) = self.find_method("init") {
             initializer
-                .bind_rc(instance_rc.clone())
-                .call(interpreter, arguments)?;
+                .bind(instance.clone())
+                .invoke(interpreter, arguments)?;
         }
 
-        Ok(Value::Instance(instance_rc))
+        Ok(Value::Instance(instance))
     }
 
     fn arity(&self) -> usize {
@@ -74,34 +74,38 @@ impl<'a> LoxCallable<'a> for LoxClass<'a> {
         CallType::Class
     }
 
-    fn clone_as_class(&self) -> Option<Rc<LoxClass<'a>>> {
-        Some(Rc::new(self.clone()))
+    fn as_class(self: Rc<Self>) -> Option<Rc<LoxClass<'a>>> {
+        Some(self)
     }
 }
 
-#[derive(Clone)]
 pub struct LoxInstance<'a> {
-    pub class: LoxClass<'a>,
-    pub fields: Rc<RefCell<HashMap<&'a str, Value<'a>>>>,
+    pub class: Rc<LoxClass<'a>>,
+    pub fields: HashMap<&'a str, Value<'a>>,
 }
 
 impl<'a> LoxInstance<'a> {
-    pub fn new(class: LoxClass<'a>) -> Self {
+    pub fn new(class: Rc<LoxClass<'a>>) -> Self {
         Self {
             class,
-            fields: Rc::new(RefCell::new(HashMap::new())),
+            fields: HashMap::new(),
         }
     }
 
-    pub fn get(&self, name: Token<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
-        if let Some(value) = self.fields.borrow().get(name.lexeme) {
+    /// Looks up a field or method. Takes the instance's `Rc` so that methods are bound to this
+    /// very instance and not to a copy of it.
+    pub fn get(
+        instance: &Rc<RefCell<LoxInstance<'a>>>,
+        name: Token<'a>,
+    ) -> Result<Value<'a>, RuntimeError<'a>> {
+        let this = instance.borrow();
+
+        if let Some(value) = this.fields.get(name.lexeme) {
             return Ok(value.clone());
         }
 
-        let method = self.class.find_method(name.lexeme);
-        if let Some(method) = method {
-            // TODO: Clone
-            return Ok(Value::Callable(Rc::new(method.bind(self.clone()).clone())));
+        if let Some(method) = this.class.find_method(name.lexeme) {
+            return Ok(Value::Callable(Rc::new(method.bind(instance.clone()))));
         }
 
         Err(RuntimeError::ClassError(ClassError::UndefinedProperty {
@@ -110,7 +114,7 @@ impl<'a> LoxInstance<'a> {
     }
 
     pub fn set(&mut self, name: Token<'a>, value: Value<'a>) {
-        self.fields.borrow_mut().insert(name.lexeme, value);
+        self.fields.insert(name.lexeme, value);
     }
 }
 
