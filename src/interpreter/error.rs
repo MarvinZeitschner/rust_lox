@@ -10,7 +10,7 @@ pub enum RuntimeError<'a> {
     NumberOperand { operator: Token<'a> },
 
     #[error("[line {}] Operands must be numbers.", operator.line)]
-    MutlipleNumberOperands { operator: Token<'a> },
+    MultipleNumberOperands { operator: Token<'a> },
 
     #[error("[line {}] Operands must be two numbers or two strings.", operator.line)]
     NumberOrStringOperands { operator: Token<'a> },
@@ -28,14 +28,8 @@ pub enum RuntimeError<'a> {
         given_len: usize,
     },
 
-    #[error("Internal Error: Error while creating environments.")]
-    EnvironmentCreationError,
-
     #[error("Failed to write output: {0}")]
     Output(String),
-
-    #[error("{0}")]
-    CallableError(#[from] CallableError),
 
     #[error("{0}")]
     ClassError(ClassError<'a>),
@@ -43,15 +37,6 @@ pub enum RuntimeError<'a> {
     // Not an actual Error, but rather a special type to unwind the interpreter to the call method of LoxCallable when a value is returned
     #[error("Internal Error: Unhandled return.")]
     Return(Return<'a>),
-}
-
-#[derive(Error, Debug, PartialEq, PartialOrd, Clone)]
-pub enum CallableError {
-    #[error("Internal Error")]
-    InternalError,
-
-    #[error("Parameter not Found; Internal Error")]
-    ParamNotFound,
 }
 
 #[derive(Error, Debug, PartialEq, PartialOrd, Clone)]
@@ -73,9 +58,6 @@ pub enum ClassError<'a> {
 pub enum ResolverError<'a> {
     #[error("[line {}] Can't read local variable in its own initializer.", token.line)]
     VariableInOwnInitializer { token: Token<'a> },
-
-    #[error("Internal Error")]
-    InternalResolverError,
 
     #[error("[line {}] Already a variable with this name in this scope.", token.line)]
     SameNameVariableInLocalScope { token: Token<'a> },

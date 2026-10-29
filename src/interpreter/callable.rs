@@ -1,32 +1,24 @@
-use std::{cell::RefCell, collections::VecDeque, fmt, rc::Rc};
+use std::{cell::RefCell, fmt, rc::Rc};
 
-use crate::ast::StmtFunction;
+use crate::ast::{Local, StmtFunction};
 
 use super::{
     class::{LoxClass, LoxInstance},
     environment::Environment,
-    error::{CallableError, RuntimeError},
+    error::RuntimeError,
     value::Value,
     Interpreter,
 };
-
-pub enum CallType {
-    Class,
-    Function,
-}
 
 pub trait LoxCallable<'a>: 'a {
     /// Takes `Rc<Self>` so that a class can hand out a reference to itself to its instances.
     fn call(
         self: Rc<Self>,
         interpreter: &mut Interpreter<'a>,
-        arguments: VecDeque<Value<'a>>,
+        arguments: Vec<Value<'a>>,
     ) -> Result<Value<'a>, RuntimeError<'a>>;
     fn arity(&self) -> usize;
     fn to_string(&self) -> String;
-    fn call_type(&self) -> CallType {
-        CallType::Function
-    }
     fn as_class(self: Rc<Self>) -> Option<Rc<LoxClass<'a>>> {
         None
     }
@@ -41,14 +33,16 @@ impl<'a> fmt::Debug for dyn LoxCallable<'a> {
 #[derive(Debug, Clone)]
 pub struct LoxFunction<'a> {
     pub declaration: &'a StmtFunction<'a>,
-    pub closure: Rc<RefCell<Environment<'a>>>,
+    /// The environment the function was defined in. `None` for functions defined at the top
+    /// level, whose surrounding variables are the globals.
+    pub closure: Option<Rc<RefCell<Environment<'a>>>>,
     pub is_initializer: bool,
 }
 
 impl<'a> LoxFunction<'a> {
     pub fn new(
         declaration: &'a StmtFunction<'a>,
-        closure: Rc<RefCell<Environment<'a>>>,
+        closure: Option<Rc<RefCell<Environment<'a>>>>,
         is_initializer: bool,
     ) -> Self {
         Self {
@@ -57,12 +51,13 @@ impl<'a> LoxFunction<'a> {
             is_initializer,
         }
     }
+    /// Returns this method with `this` bound to `instance`, in slot 0 of a new environment.
     pub fn bind(&self, instance: Rc<RefCell<LoxInstance<'a>>>) -> Self {
-        let mut environment = Environment::new(Some(self.closure.clone()));
-        environment.define("this", Value::Instance(instance));
+        let environment =
+            Environment::with_values(vec![Value::Instance(instance)], self.closure.clone());
         Self {
             declaration: self.declaration,
-            closure: Rc::new(RefCell::new(environment)),
+            closure: Some(Rc::new(RefCell::new(environment))),
             is_initializer: self.is_initializer,
         }
     }
@@ -70,28 +65,20 @@ impl<'a> LoxFunction<'a> {
     pub fn invoke(
         &self,
         interpreter: &mut Interpreter<'a>,
-        mut arguments: VecDeque<Value<'a>>,
+        arguments: Vec<Value<'a>>,
     ) -> Result<Value<'a>, RuntimeError<'a>> {
-        let mut environment = Environment::new(Some(self.closure.clone()));
-
-        for i in 0..self.declaration.params.len() {
-            let lexeme = &self
-                .declaration
-                .params
-                .get(i)
-                .ok_or(CallableError::ParamNotFound)?
-                .lexeme;
-
-            let argument = arguments.pop_front().ok_or(CallableError::InternalError)?;
-
-            environment.define(lexeme, argument);
-        }
+        // The parameters are the first variables of the function's scope, so the arguments
+        // already are the first slots of its environment. `visit_call` checked the arity.
+        let environment = Environment::with_values(arguments, self.closure.clone());
 
         match interpreter.execute_block(&self.declaration.body, environment) {
             // An initializer always returns `this`, even after an early `return;`
-            Ok(()) | Err(RuntimeError::Return(_)) if self.is_initializer => {
-                Ok(self.closure.borrow().get_at(0, "this"))
-            }
+            Ok(()) | Err(RuntimeError::Return(_)) if self.is_initializer => Ok(self
+                .closure
+                .as_ref()
+                .expect("initializers are always bound to an instance")
+                .borrow()
+                .get_at(Local { depth: 0, slot: 0 })),
             Ok(()) => Ok(Value::Nil),
             Err(RuntimeError::Return(value)) => Ok(value.value),
             Err(err) => Err(err),
@@ -103,7 +90,7 @@ impl<'a> LoxCallable<'a> for LoxFunction<'a> {
     fn call(
         self: Rc<Self>,
         interpreter: &mut Interpreter<'a>,
-        arguments: VecDeque<Value<'a>>,
+        arguments: Vec<Value<'a>>,
     ) -> Result<Value<'a>, RuntimeError<'a>> {
         self.invoke(interpreter, arguments)
     }

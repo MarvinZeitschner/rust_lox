@@ -8,7 +8,7 @@ use crate::lex::Token;
 #[strum_discriminants(name(ParserErrorContext))]
 pub enum ParserError<'a> {
     #[error("[line {}] Error: Expected ')' after expression.", token.line)]
-    UnmatchedParanthesis { token: Token<'a> },
+    UnmatchedParenthesis { token: Token<'a> },
 
     #[error("[line {}] Error: Expected '(' after if.", token.line)]
     ExpectedLeftParenAfterIf { token: Token<'a> },
@@ -27,9 +27,6 @@ pub enum ParserError<'a> {
 
     #[error("[line {}] Error: Expected ')' after for arguments.", token.line)]
     ExpectedRightParenAfterArguments { token: Token<'a> },
-
-    #[error("[line {}] Error: Expected expression.", token.line)]
-    ExpectedExpression { token: Token<'a> },
 
     #[error("[line {}] Error: Expected semicolon.", token.line)]
     ExpectedSemicolon { token: Token<'a> },
@@ -60,9 +57,6 @@ pub enum ParserError<'a> {
 
     #[error("[line {}] Error: Unexpected token: {}.", token.line, token.lexeme)]
     UnexpectedToken { token: Token<'a> },
-
-    #[error("[line {}] Error: Unexpected end of file.", token.line)]
-    UnexpectedEOF { token: Token<'a> },
 
     #[error("[line {}] Error: Invalid assignment target.", token.line)]
     InvalidAssignmentTarget { token: Token<'a> },
@@ -107,7 +101,7 @@ pub enum ParserError<'a> {
 impl<'a> ParserErrorContext {
     pub fn to_error(self, token: Token<'a>) -> ParserError<'a> {
         match self {
-            ParserErrorContext::UnmatchedParanthesis => ParserError::UnmatchedParanthesis { token },
+            ParserErrorContext::UnmatchedParenthesis => ParserError::UnmatchedParenthesis { token },
             ParserErrorContext::ExpectedLeftParenAfterIf => {
                 ParserError::ExpectedLeftParenAfterIf { token }
             }
@@ -120,10 +114,8 @@ impl<'a> ParserErrorContext {
             ParserErrorContext::ExpectedLeftParenAfterWhile => {
                 ParserError::ExpectedLeftParenAfterWhile { token }
             }
-            ParserErrorContext::ExpectedExpression => ParserError::ExpectedExpression { token },
             ParserErrorContext::ExpectedSemicolon => ParserError::ExpectedSemicolon { token },
             ParserErrorContext::UnexpectedToken => ParserError::UnexpectedToken { token },
-            ParserErrorContext::UnexpectedEOF => ParserError::UnexpectedEOF { token },
             ParserErrorContext::InvalidAssignmentTarget => {
                 ParserError::InvalidAssignmentTarget { token }
             }

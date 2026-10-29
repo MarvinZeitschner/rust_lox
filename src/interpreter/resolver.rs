@@ -21,9 +21,19 @@ pub enum ClassType {
     Subclass,
 }
 
+/// A local variable in a scope of the resolver.
+#[derive(Clone, Copy)]
+struct Declaration {
+    /// Position in the environment at runtime. Variables get their slots in declaration order,
+    /// which is the same order in which the interpreter creates them.
+    slot: usize,
+    /// `false` while the variable's own initializer is being resolved
+    defined: bool,
+}
+
 #[derive(Default)]
 pub struct Resolver<'a> {
-    scopes: Vec<HashMap<&'a str, bool>>,
+    scopes: Vec<HashMap<&'a str, Declaration>>,
     current_function: FunctionType,
     current_class: ClassType,
 }
@@ -109,29 +119,45 @@ impl<'a> Resolver<'a> {
         if scope.contains_key(name.lexeme) {
             Err(ResolverError::SameNameVariableInLocalScope { token: *name })
         } else {
-            scope.insert(name.lexeme, false);
+            let slot = scope.len();
+            scope.insert(
+                name.lexeme,
+                Declaration {
+                    slot,
+                    defined: false,
+                },
+            );
             Ok(())
         }
     }
 
     fn define(&mut self, name: &Token<'a>) {
-        if self.scopes.is_empty() {
-            return;
-        }
-        let scope = self.scopes.last_mut().unwrap();
-
-        if scope.contains_key(name.lexeme) {
-            scope.entry(name.lexeme).and_modify(|v| *v = true);
-        } else {
-            scope.insert(name.lexeme, true);
+        if let Some(declaration) = self
+            .scopes
+            .last_mut()
+            .and_then(|scope| scope.get_mut(name.lexeme))
+        {
+            declaration.defined = true;
         }
     }
 
-    /// Stores in `depth` how many scopes up `name` is declared. Globals are left at `None`.
-    fn resolve_local(&mut self, depth: &Cell<Option<usize>>, name: Token<'a>) {
+    /// Opens a scope that only contains `name`, like the ones for `this` and `super`.
+    fn begin_scope_with(&mut self, name: &'a str) {
+        let declaration = Declaration {
+            slot: 0,
+            defined: true,
+        };
+        self.scopes.push(HashMap::from([(name, declaration)]));
+    }
+
+    /// Stores in `local` where `name` is declared. Globals are left at `None`.
+    fn resolve_local(&mut self, local: &Cell<Option<Local>>, name: Token<'a>) {
         for (i, scope) in self.scopes.iter().enumerate().rev() {
-            if scope.contains_key(name.lexeme) {
-                depth.set(Some(self.scopes.len() - 1 - i));
+            if let Some(declaration) = scope.get(name.lexeme) {
+                local.set(Some(Local {
+                    depth: self.scopes.len() - 1 - i,
+                    slot: declaration.slot,
+                }));
                 return;
             }
         }
@@ -195,7 +221,7 @@ impl<'a> Resolver<'a> {
                 token: node.keyword,
             });
         }
-        self.resolve_local(&node.depth, node.keyword);
+        self.resolve_local(&node.local, node.keyword);
         Ok(())
     }
 
@@ -206,7 +232,7 @@ impl<'a> Resolver<'a> {
             });
         }
 
-        self.resolve_local(&node.depth, node.keyword);
+        self.resolve_local(&node.local, node.keyword);
         Ok(())
     }
 
@@ -235,7 +261,7 @@ impl<'a> Resolver<'a> {
 
     fn visit_assign(&mut self, node: &ExprAssign<'a>) -> Result<(), ResolverError<'a>> {
         self.resolve_expr(&node.value)?;
-        self.resolve_local(&node.depth, node.name);
+        self.resolve_local(&node.local, node.name);
         Ok(())
     }
 
@@ -243,14 +269,14 @@ impl<'a> Resolver<'a> {
         if !self.scopes.is_empty() {
             let scope = self.scopes.last().unwrap();
 
-            if let Some(var) = scope.get(node.name.lexeme) {
-                if !(*var) {
+            if let Some(declaration) = scope.get(node.name.lexeme) {
+                if !declaration.defined {
                     return Err(ResolverError::VariableInOwnInitializer { token: node.name });
                 }
             }
         }
 
-        self.resolve_local(&node.depth, node.name);
+        self.resolve_local(&node.local, node.name);
 
         Ok(())
     }
@@ -287,12 +313,10 @@ impl<'a> Resolver<'a> {
 
         if node.superclass.is_some() {
             self.current_class = ClassType::Subclass;
-            self.begin_scope();
-            self.scopes.last_mut().unwrap().insert("super", true);
+            self.begin_scope_with("super");
         }
 
-        self.begin_scope();
-        self.scopes.last_mut().unwrap().insert("this", true);
+        self.begin_scope_with("this");
 
         node.methods.iter().try_for_each(|method| {
             let mut declaration = FunctionType::Method;

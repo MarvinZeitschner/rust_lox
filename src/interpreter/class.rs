@@ -1,9 +1,11 @@
-use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
+use std::{cell::RefCell, fmt, rc::Rc};
+
+use rustc_hash::FxHashMap;
 
 use crate::lex::Token;
 
 use super::{
-    callable::{CallType, LoxCallable, LoxFunction},
+    callable::{LoxCallable, LoxFunction},
     error::{ClassError, RuntimeError},
     value::Value,
 };
@@ -12,14 +14,14 @@ use super::{
 pub struct LoxClass<'a> {
     pub name: &'a str,
     pub superclass: Option<Rc<LoxClass<'a>>>,
-    pub methods: HashMap<&'a str, LoxFunction<'a>>,
+    pub methods: FxHashMap<&'a str, LoxFunction<'a>>,
 }
 
 impl<'a> LoxClass<'a> {
     pub fn new(
         name: &'a str,
         superclass: Option<Rc<LoxClass<'a>>>,
-        methods: HashMap<&'a str, LoxFunction<'a>>,
+        methods: FxHashMap<&'a str, LoxFunction<'a>>,
     ) -> Self {
         Self {
             name,
@@ -45,7 +47,7 @@ impl<'a> LoxCallable<'a> for LoxClass<'a> {
     fn call(
         self: Rc<Self>,
         interpreter: &mut super::Interpreter<'a>,
-        arguments: std::collections::VecDeque<super::value::Value<'a>>,
+        arguments: Vec<super::value::Value<'a>>,
     ) -> Result<super::value::Value<'a>, super::error::RuntimeError<'a>> {
         let instance = Rc::new(RefCell::new(LoxInstance::new(self.clone())));
 
@@ -59,8 +61,7 @@ impl<'a> LoxCallable<'a> for LoxClass<'a> {
     }
 
     fn arity(&self) -> usize {
-        let inizializer = self.find_method("init");
-        if let Some(initializer) = inizializer {
+        if let Some(initializer) = self.find_method("init") {
             return initializer.arity();
         }
         0
@@ -70,10 +71,6 @@ impl<'a> LoxCallable<'a> for LoxClass<'a> {
         self.name.to_string()
     }
 
-    fn call_type(&self) -> super::callable::CallType {
-        CallType::Class
-    }
-
     fn as_class(self: Rc<Self>) -> Option<Rc<LoxClass<'a>>> {
         Some(self)
     }
@@ -81,14 +78,14 @@ impl<'a> LoxCallable<'a> for LoxClass<'a> {
 
 pub struct LoxInstance<'a> {
     pub class: Rc<LoxClass<'a>>,
-    pub fields: HashMap<&'a str, Value<'a>>,
+    pub fields: FxHashMap<&'a str, Value<'a>>,
 }
 
 impl<'a> LoxInstance<'a> {
     pub fn new(class: Rc<LoxClass<'a>>) -> Self {
         Self {
             class,
-            fields: HashMap::new(),
+            fields: FxHashMap::default(),
         }
     }
 

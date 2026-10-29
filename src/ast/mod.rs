@@ -14,8 +14,15 @@ pub enum LiteralValue {
     Nil,
 }
 
-/// `depth` is filled in by the resolver: the number of environments between the use of a local
-/// variable and its declaration. `None` means the variable is global.
+/// Where the resolver found a local variable: `depth` environments up from the use, at position
+/// `slot` in that environment.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Local {
+    pub depth: usize,
+    pub slot: usize,
+}
+
+/// `local` is filled in by the resolver. `None` means the variable is global.
 #[derive(Ast, Debug, PartialEq)]
 #[name = "Expr"]
 pub enum Expression<'a> {
@@ -38,11 +45,11 @@ pub enum Expression<'a> {
     Super {
         keyword: Token<'a>,
         method: Token<'a>,
-        depth: Cell<Option<usize>>,
+        local: Cell<Option<Local>>,
     },
     This {
         keyword: Token<'a>,
-        depth: Cell<Option<usize>>,
+        local: Cell<Option<Local>>,
     },
     Unary {
         operator: Token<'a>,
@@ -65,11 +72,11 @@ pub enum Expression<'a> {
     Assign {
         name: Token<'a>,
         value: Box<Expr<'a>>,
-        depth: Cell<Option<usize>>,
+        local: Cell<Option<Local>>,
     },
     Variable {
         name: Token<'a>,
-        depth: Cell<Option<usize>>,
+        local: Cell<Option<Local>>,
     },
 }
 

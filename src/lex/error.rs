@@ -7,7 +7,4 @@ pub enum TokenError {
 
     #[error("[line {line}] Error: Unexpected token `{token}`")]
     UnexpectedToken { line: u32, token: String },
-
-    #[error("Unexpected end of file")]
-    UnexpectedEOF,
 }

@@ -1,0 +1,42 @@
+// Local variables are stored in slots that the resolver assigns in declaration order. These
+// cases must all find the right slot.
+{
+  var a = "a";
+  var b = "b";
+  {
+    var b = "inner b";       // shadows, gets slot 0 of the inner block
+    var c = a + b;
+    print c;                 // expect: ainner b
+  }
+  print b;                   // expect: b
+
+  // A local function that calls itself through its own slot
+  fun countdown(n) {
+    if (n == 0) return "done";
+    return countdown(n - 1);
+  }
+  print countdown(3);        // expect: done
+
+  // A closure over a parameter and over a local declared after the parameters
+  fun make(prefix) {
+    var suffix = "!";
+    fun greet(name) { return prefix + name + suffix; }
+    return greet;
+  }
+  print make("hi ")("lox");  // expect: hi lox!
+
+  // Local classes: the class name is defined after its methods are created, but must still land
+  // on the slot the resolver assigned to it
+  class Base {
+    name() { return "base"; }
+  }
+  var between = "between";
+  class Derived < Base {
+    name() { return "derived of " + super.name(); }
+    same() { return Derived; }
+  }
+  var d = Derived();
+  print d.name();            // expect: derived of base
+  print d.same() == Derived; // expect: true
+  print between;             // expect: between
+}

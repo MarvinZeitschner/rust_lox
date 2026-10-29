@@ -8,10 +8,11 @@ pub mod value;
 
 use std::{
     cell::RefCell,
-    collections::{HashMap, VecDeque},
     io::{self, Write},
     rc::Rc,
 };
+
+use rustc_hash::FxHashMap;
 
 use callable::LoxFunction;
 use class::{LoxClass, LoxInstance};
@@ -26,8 +27,11 @@ use crate::{
 };
 
 pub struct Interpreter<'a> {
-    environment: Rc<RefCell<Environment<'a>>>,
-    globals: Rc<RefCell<Environment<'a>>>,
+    /// The innermost local scope, `None` while executing top-level code
+    environment: Option<Rc<RefCell<Environment<'a>>>>,
+    /// Globals are looked up by name, because they can be used before they are defined (e.g. by
+    /// a function that is only called later)
+    globals: FxHashMap<&'a str, Value<'a>>,
     output: Box<dyn Write>,
 }
 
@@ -45,13 +49,11 @@ impl<'a> Interpreter<'a> {
 
     /// Creates an interpreter that writes the output of `print` statements to `output`.
     pub fn with_output(output: Box<dyn Write>) -> Self {
-        let globals = Rc::new(RefCell::new(Environment::new(None)));
-        globals
-            .borrow_mut()
-            .define("clock", Value::Callable(Rc::new(Clock::new())));
+        let mut globals = FxHashMap::default();
+        globals.insert("clock", Value::Callable(Rc::new(Clock::new())));
 
         Interpreter {
-            environment: globals.clone(),
+            environment: None,
             globals,
             output,
         }
@@ -83,7 +85,7 @@ impl<'a> Interpreter<'a> {
     ) -> Result<(), RuntimeError<'a>> {
         // The block's environment is dropped once nothing references it anymore. Closures
         // created inside the block keep it alive through their own Rc.
-        let prev = std::mem::replace(&mut self.environment, Rc::new(RefCell::new(environment)));
+        let prev = self.environment.replace(Rc::new(RefCell::new(environment)));
 
         let result = statements.iter().try_for_each(|stmt| self.execute(stmt));
 
@@ -128,19 +130,42 @@ impl<'a> Interpreter<'a> {
     ) -> Result<(), RuntimeError<'a>> {
         match (left, right) {
             (Value::Number(_), Value::Number(_)) => Ok(()),
-            _ => Err(RuntimeError::MutlipleNumberOperands { operator }),
+            _ => Err(RuntimeError::MultipleNumberOperands { operator }),
         }
     }
 
-    /// `depth` is the resolver's result: `Some(d)` for a local `d` environments up, `None` for a global.
+    /// The innermost local environment. Only called for variables the resolver found to be
+    /// local, which can't happen in top-level code.
+    fn local_environment(&self) -> &Rc<RefCell<Environment<'a>>> {
+        self.environment
+            .as_ref()
+            .expect("local variables only exist inside a local scope")
+    }
+
+    /// Creates a variable in the current scope: the next slot of the local environment, or a
+    /// global in top-level code.
+    fn define(&mut self, name: &'a str, value: Value<'a>) {
+        match &self.environment {
+            Some(environment) => environment.borrow_mut().define(value),
+            None => {
+                self.globals.insert(name, value);
+            }
+        }
+    }
+
+    /// `local` is the resolver's result for this use of the variable, `None` for a global.
     fn lookup_variable(
         &mut self,
         name: Token<'a>,
-        depth: Option<usize>,
+        local: Option<Local>,
     ) -> Result<Value<'a>, RuntimeError<'a>> {
-        match depth {
-            Some(d) => Ok(self.environment.borrow().get_at(d, name.lexeme)),
-            None => self.globals.borrow().get(name),
+        match local {
+            Some(local) => Ok(self.local_environment().borrow().get_at(local)),
+            None => self
+                .globals
+                .get(name.lexeme)
+                .cloned()
+                .ok_or(RuntimeError::UndefinedVariable { name }),
         }
     }
 }
@@ -183,18 +208,23 @@ impl<'a> Interpreter<'a> {
     }
 
     fn visit_super(&mut self, node: &ExprSuper<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
-        // `super` is always local to a method, so the resolver always sets the depth
-        let distance = node.depth.get().expect("resolver sets the depth of 'super'");
+        // `super` is always local to a method, so the resolver always finds it. `this` is in the
+        // environment right below the one of `super`; both are in slot 0 of their environment.
+        let local = node.local.get().expect("resolver resolves 'super'");
+        let this = Local {
+            depth: local.depth - 1,
+            slot: 0,
+        };
 
-        let superclass = self.environment.borrow().get_at(distance, "super");
-        let object = self.environment.borrow().get_at(distance - 1, "this");
+        let superclass = self.local_environment().borrow().get_at(local);
+        let object = self.local_environment().borrow().get_at(this);
 
         let superclass = match superclass {
-            Value::Callable(callable) => callable.as_class().ok_or(
-                RuntimeError::ClassError(ClassError::SuperclassNotAClass {
+            Value::Callable(callable) => callable.as_class().ok_or(RuntimeError::ClassError(
+                ClassError::SuperclassNotAClass {
                     token: node.keyword,
-                }),
-            )?,
+                },
+            ))?,
             _ => {
                 return Err(RuntimeError::ClassError(ClassError::SuperclassNotAClass {
                     token: node.keyword,
@@ -221,7 +251,7 @@ impl<'a> Interpreter<'a> {
 
     fn visit_this(&mut self, node: &ExprThis<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
         // TODO: Clone
-        self.lookup_variable(node.keyword, node.depth.get())
+        self.lookup_variable(node.keyword, node.local.get())
     }
 
     fn visit_unary(&mut self, node: &ExprUnary<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
@@ -290,11 +320,11 @@ impl<'a> Interpreter<'a> {
     fn visit_call(&mut self, node: &ExprCall<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
         let callee = self.evaluate(&node.callee)?;
 
-        let arguments: VecDeque<Value<'a>> = node
+        let arguments = node
             .arguments
             .iter()
             .map(|argument| self.evaluate(argument))
-            .collect::<Result<VecDeque<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()?;
 
         let Value::Callable(function) = callee else {
             return Err(RuntimeError::NotCallable { token: node.paren });
@@ -326,20 +356,22 @@ impl<'a> Interpreter<'a> {
     fn visit_assign(&mut self, node: &ExprAssign<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
         let value = self.evaluate(&node.value)?;
 
-        match node.depth.get() {
-            Some(d) => {
-                self.environment
-                    .borrow_mut()
-                    .assign_at(d, node.name, value.clone());
-            }
-            None => self.globals.borrow_mut().assign(node.name, value.clone())?,
+        match node.local.get() {
+            Some(local) => self
+                .local_environment()
+                .borrow_mut()
+                .assign_at(local, value.clone()),
+            None => match self.globals.get_mut(node.name.lexeme) {
+                Some(global) => *global = value.clone(),
+                None => return Err(RuntimeError::UndefinedVariable { name: node.name }),
+            },
         }
 
         Ok(value)
     }
 
     fn visit_variable(&mut self, node: &ExprVariable<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
-        self.lookup_variable(node.name, node.depth.get())
+        self.lookup_variable(node.name, node.local.get())
     }
 }
 
@@ -347,10 +379,7 @@ impl<'a> Interpreter<'a> {
 /// Statements borrow the AST for `'a` because functions keep a reference to their declaration.
 impl<'a> Interpreter<'a> {
     fn visit_block(&mut self, node: &'a StmtBlock<'a>) -> Result<(), RuntimeError<'a>> {
-        self.execute_block(
-            &node.statements,
-            Environment::new(Some(self.environment.clone())),
-        )?;
+        self.execute_block(&node.statements, Environment::new(self.environment.clone()))?;
         Ok(())
     }
 
@@ -367,24 +396,21 @@ impl<'a> Interpreter<'a> {
                     Some(class)
                 }
                 _ => {
-                    return Err(RuntimeError::ClassError(
-                        ClassError::SuperclassNotAClass { token: node.name },
-                    ))
+                    return Err(RuntimeError::ClassError(ClassError::SuperclassNotAClass {
+                        token: node.name,
+                    }))
                 }
             };
         }
 
-        self.environment
-            .borrow_mut()
-            .define(node.name.lexeme, Value::Nil);
-
+        // Methods see `super` in slot 0 of an extra environment around them
+        let enclosing = self.environment.clone();
         if let Some(superclass_value) = superclass_value {
-            let mut environment = Environment::new(Some(self.environment.clone()));
-            environment.define("super", superclass_value);
-            self.environment = Rc::new(RefCell::new(environment));
+            let environment = Environment::with_values(vec![superclass_value], enclosing.clone());
+            self.environment = Some(Rc::new(RefCell::new(environment)));
         }
 
-        let mut methods = HashMap::new();
+        let mut methods = FxHashMap::default();
         node.methods.iter().for_each(|method| {
             let function = LoxFunction::new(
                 method,
@@ -395,15 +421,11 @@ impl<'a> Interpreter<'a> {
         });
 
         let class = LoxClass::new(node.name.lexeme, superclass, methods);
+        self.environment = enclosing;
 
-        if node.superclass.is_some() {
-            let enclosing = self.environment.borrow().enclosing.clone().unwrap();
-            self.environment = enclosing;
-        }
-
-        self.environment
-            .borrow_mut()
-            .assign(node.name, Value::Callable(Rc::new(class)))?;
+        // Defined only now instead of before the methods: in between, the resolver only opened
+        // other scopes, so the class still gets the slot the resolver assigned to its name
+        self.define(node.name.lexeme, Value::Callable(Rc::new(class)));
 
         Ok(())
     }
@@ -416,9 +438,7 @@ impl<'a> Interpreter<'a> {
     fn visit_function(&mut self, node: &'a StmtFunction<'a>) -> Result<(), RuntimeError<'a>> {
         let function = LoxFunction::new(node, self.environment.clone(), false);
 
-        self.environment
-            .borrow_mut()
-            .define(node.name.lexeme, Value::Callable(Rc::new(function)));
+        self.define(node.name.lexeme, Value::Callable(Rc::new(function)));
 
         Ok(())
     }
@@ -455,7 +475,7 @@ impl<'a> Interpreter<'a> {
             Some(initializer) => self.evaluate(initializer)?,
             None => Value::Nil,
         };
-        self.environment.borrow_mut().define(node.name.lexeme, value);
+        self.define(node.name.lexeme, value);
         Ok(())
     }
 

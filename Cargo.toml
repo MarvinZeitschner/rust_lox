@@ -8,6 +8,7 @@ clap = { version = "4.5.26", features = ["derive"] }
 thiserror = "2.0.11"
 strum = { version = "0.27.1", features = ["derive"] }
 ast_macro = { path = "ast_macro" }
+rustc-hash = "2.1.3"
 
 [dev-dependencies]
 criterion = { version = "0.8.2", features = ["html_reports"] }

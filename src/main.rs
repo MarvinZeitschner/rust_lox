@@ -1,9 +1,5 @@
 use clap::Parser;
-use rust_lox::{
-    interpreter::{resolver::Resolver, Interpreter},
-    lex::Scanner,
-    parser::{self, TokenStream},
-};
+use rust_lox::interpreter::Interpreter;
 use std::fs;
 
 #[derive(Parser, Debug)]
@@ -18,39 +14,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let contents = fs::read_to_string(&args.path)?;
 
-    let mut lexer = Scanner::new(&contents);
-    let tokens = lexer.scan_tokens();
-    let tokens = match tokens {
-        Ok(t) => t,
-        Err(errors) => {
-            errors.iter().for_each(|e| eprintln!("{e:#}"));
-            std::process::exit(65);
-        }
-    };
-
-    let mut parser = parser::Parser::new(TokenStream::new(tokens));
-    let stmts = match parser.parse() {
-        Ok(s) => s,
-        Err(errors) => {
-            errors.iter().for_each(|e| eprintln!("{e:#}"));
-            std::process::exit(65);
-        }
-    };
-
-    let mut resolver = Resolver::new();
-    if let Err(errors) = resolver.resolve(&stmts) {
-        errors.iter().for_each(|e| eprintln!("{e:#}"));
-        std::process::exit(65);
-    }
-
     let mut interpreter = Interpreter::new();
-    let res = interpreter.interpret(&stmts);
-
-    match res {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            eprintln!("{e:#}");
-            std::process::exit(70);
-        }
+    if let Err(err) = rust_lox::run(&mut interpreter, &contents) {
+        eprintln!("{err}");
+        std::process::exit(err.exit_code());
     }
+
+    Ok(())
 }

@@ -25,7 +25,10 @@ const PROGRAMS: &[(&str, &str)] = &[
     ("invocation", include_str!("programs/invocation.lox")),
     ("method_call", include_str!("programs/method_call.lox")),
     ("properties", include_str!("programs/properties.lox")),
-    ("string_equality", include_str!("programs/string_equality.lox")),
+    (
+        "string_equality",
+        include_str!("programs/string_equality.lox"),
+    ),
     ("trees", include_str!("programs/trees.lox")),
     ("zoo", include_str!("programs/zoo.lox")),
 ];

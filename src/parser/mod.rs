@@ -186,10 +186,9 @@ impl<'a> Parser<'a> {
     }
 
     fn var_declaration(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
-        let name = self.tokenstream.consume(
-            &TokenType::Ident,
-            ParserErrorContext::ExpectedVariableName,
-        )?;
+        let name = self
+            .tokenstream
+            .consume(&TokenType::Ident, ParserErrorContext::ExpectedVariableName)?;
         let mut initializer = None;
         if self.tokenstream.match_l(&[TokenType::Equal])? {
             initializer = Some(self.expression()?);
@@ -603,7 +602,7 @@ impl<'a> Parser<'a> {
                 let expr = self.expression()?;
                 self.tokenstream.consume(
                     &TokenType::RightParen,
-                    ParserErrorContext::UnmatchedParanthesis,
+                    ParserErrorContext::UnmatchedParenthesis,
                 )?;
                 Ok(Expr::Grouping(ExprGrouping::new(Box::new(expr))))
             }
@@ -711,6 +710,9 @@ mod test {
         let span = Span { begin: 5, end: 6 };
         let right = Token::new(TokenType::Number(1.0), "1", 1, span);
 
-        assert_eq!(errors, vec![ParserError::UnmatchedParanthesis { token: right }]);
+        assert_eq!(
+            errors,
+            vec![ParserError::UnmatchedParenthesis { token: right }]
+        );
     }
 }
