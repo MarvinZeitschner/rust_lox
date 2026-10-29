@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{cell::Cell, collections::HashMap};
 
 use crate::{ast::*, lex::Token};
 
@@ -24,7 +24,6 @@ pub enum ClassType {
 #[derive(Default)]
 pub struct Resolver<'a> {
     scopes: Vec<HashMap<&'a str, bool>>,
-    locals: HashMap<Expr<'a>, usize>,
     current_function: FunctionType,
     current_class: ClassType,
 }
@@ -33,7 +32,6 @@ impl<'a, 'b: 'a> Resolver<'a> {
     pub fn new() -> Self {
         Self {
             scopes: vec![],
-            locals: HashMap::new(),
             current_function: FunctionType::None,
             current_class: ClassType::None,
         }
@@ -56,10 +54,6 @@ impl<'a, 'b: 'a> Resolver<'a> {
             true => Ok(()),
             false => Err(errors),
         }
-    }
-
-    pub fn get_locals(self) -> HashMap<Expr<'a>, usize> {
-        self.locals
     }
 
     fn resolve_stmt(&mut self, stmt: &'b Stmt<'a>) -> Result<(), ResolverError<'a>> {
@@ -110,10 +104,11 @@ impl<'a, 'b: 'a> Resolver<'a> {
         }
     }
 
-    fn resolve_local(&mut self, expr: Expr<'a>, name: Token<'a>) {
+    /// Stores in `depth` how many scopes up `name` is declared. Globals are left at `None`.
+    fn resolve_local(&mut self, depth: &Cell<Option<usize>>, name: Token<'a>) {
         for (i, scope) in self.scopes.iter().enumerate().rev() {
             if scope.contains_key(name.lexeme) {
-                self.locals.insert(expr, self.scopes.len() - 1 - i);
+                depth.set(Some(self.scopes.len() - 1 - i));
                 return;
             }
         }
@@ -178,7 +173,7 @@ impl<'a, 'b: 'a> ExprVisitor<'a, 'b> for Resolver<'a> {
                 token: node.keyword,
             });
         }
-        self.resolve_local(Expr::Super(node.clone()), node.keyword);
+        self.resolve_local(&node.depth, node.keyword);
         Ok(())
     }
 
@@ -189,7 +184,7 @@ impl<'a, 'b: 'a> ExprVisitor<'a, 'b> for Resolver<'a> {
             });
         }
 
-        self.resolve_local(Expr::This(node.clone()), node.keyword);
+        self.resolve_local(&node.depth, node.keyword);
         Ok(())
     }
 
@@ -218,7 +213,7 @@ impl<'a, 'b: 'a> ExprVisitor<'a, 'b> for Resolver<'a> {
 
     fn visit_assign(&mut self, node: &'b ExprAssign<'a>) -> Self::Output {
         self.resolve_expr(&node.value)?;
-        self.resolve_local(Expr::Assign(node.clone()), node.name);
+        self.resolve_local(&node.depth, node.name);
         Ok(())
     }
 
@@ -233,7 +228,7 @@ impl<'a, 'b: 'a> ExprVisitor<'a, 'b> for Resolver<'a> {
             }
         }
 
-        self.resolve_local(Expr::Variable(node.clone()), node.name);
+        self.resolve_local(&node.depth, node.name);
 
         Ok(())
     }

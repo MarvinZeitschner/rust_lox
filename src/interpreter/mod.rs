@@ -28,18 +28,17 @@ use crate::{
 pub struct Interpreter<'a> {
     environment: Rc<RefCell<Environment<'a>>>,
     globals: Rc<RefCell<Environment<'a>>>,
-    locals: HashMap<Expr<'a>, usize>,
     output: Box<dyn Write>,
 }
 
 impl<'a, 'b: 'a> Interpreter<'a> {
     /// Creates an interpreter that prints to stdout.
-    pub fn new(locals: HashMap<Expr<'a>, usize>) -> Self {
-        Self::with_output(locals, Box::new(io::stdout()))
+    pub fn new() -> Self {
+        Self::with_output(Box::new(io::stdout()))
     }
 
     /// Creates an interpreter that writes the output of `print` statements to `output`.
-    pub fn with_output(locals: HashMap<Expr<'a>, usize>, output: Box<dyn Write>) -> Self {
+    pub fn with_output(output: Box<dyn Write>) -> Self {
         let globals = Rc::new(RefCell::new(Environment::new(None)));
         globals
             .borrow_mut()
@@ -48,7 +47,6 @@ impl<'a, 'b: 'a> Interpreter<'a> {
         Interpreter {
             environment: globals.clone(),
             globals,
-            locals,
             output,
         }
     }
@@ -105,14 +103,14 @@ impl<'a, 'b: 'a> Interpreter<'a> {
         }
     }
 
+    /// `depth` is the resolver's result: `Some(d)` for a local `d` environments up, `None` for a global.
     fn lookup_variable(
         &mut self,
         name: Token<'a>,
-        expr: &Expr<'a>,
+        depth: Option<usize>,
     ) -> Result<Value<'a>, RuntimeError<'a>> {
-        let distance = self.locals.get(expr);
-        match distance {
-            Some(&d) => Ok(self.environment.borrow().get_at(d, name.lexeme)),
+        match depth {
+            Some(d) => Ok(self.environment.borrow().get_at(d, name.lexeme)),
             None => self.globals.borrow().get(name),
         }
     }
@@ -157,11 +155,8 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
     }
 
     fn visit_super(&mut self, node: &'b ExprSuper<'a>) -> Self::Output {
-        let distance = self
-            .locals
-            .get(&Expr::Super(node.clone()))
-            .cloned()
-            .unwrap();
+        // `super` is always local to a method, so the resolver always sets the depth
+        let distance = node.depth.get().expect("resolver sets the depth of 'super'");
 
         let superclass = self.environment.borrow().get_at(distance, "super");
         let object = self.environment.borrow().get_at(distance - 1, "this");
@@ -198,7 +193,7 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
 
     fn visit_this(&mut self, node: &'b ExprThis<'a>) -> Self::Output {
         // TODO: Clone
-        self.lookup_variable(node.keyword, &Expr::This(node.clone()))
+        self.lookup_variable(node.keyword, node.depth.get())
     }
 
     fn visit_unary(&mut self, node: &ExprUnary<'a>) -> Self::Output {
@@ -303,8 +298,7 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
     fn visit_assign(&mut self, node: &ExprAssign<'a>) -> Self::Output {
         let value = self.evaluate(&node.value)?;
 
-        let distance = self.locals.get(&Expr::Assign(node.clone())).cloned();
-        match distance {
+        match node.depth.get() {
             Some(d) => {
                 self.environment
                     .borrow_mut()
@@ -317,7 +311,7 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
     }
 
     fn visit_variable(&mut self, node: &ExprVariable<'a>) -> Self::Output {
-        self.lookup_variable(node.name, &Expr::Variable(node.clone()))
+        self.lookup_variable(node.name, node.depth.get())
     }
 }
 
@@ -451,8 +445,7 @@ mod test {
     use super::*;
 
     fn setup() -> Interpreter<'static> {
-        let locals = HashMap::new();
-        Interpreter::new(locals)
+        Interpreter::new()
     }
 
     #[test]

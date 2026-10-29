@@ -7,11 +7,11 @@
 //! The programs in `benches/programs` are scaled-down versions of the ones in `bench/`
 //! so that a single iteration takes milliseconds instead of seconds.
 
-use std::{collections::HashMap, hint::black_box, io, time::Duration};
+use std::{hint::black_box, io, time::Duration};
 
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 use rust_lox::{
-    ast::{Expr, Stmt},
+    ast::Stmt,
     interpreter::{resolver::Resolver, Interpreter},
     lex::{Scanner, Token},
     parser::{Parser, TokenStream},
@@ -39,10 +39,9 @@ fn parse(tokens: Vec<Token<'_>>) -> Vec<Stmt<'_>> {
 }
 
 // The resolver requires the AST to be borrowed for as long as the source lives ('b: 'a)
-fn resolve<'a>(stmts: &'a [Stmt<'a>]) -> HashMap<Expr<'a>, usize> {
+fn resolve<'a>(stmts: &'a [Stmt<'a>]) {
     let mut resolver = Resolver::new();
     resolver.resolve(stmts).unwrap();
-    resolver.get_locals()
 }
 
 fn lexer(c: &mut Criterion) {
@@ -84,16 +83,12 @@ fn interpret(c: &mut Criterion) {
     group.sample_size(50);
     for &(name, source) in PROGRAMS {
         let stmts = parse(lex(source));
-        let locals = resolve(&stmts);
+        resolve(&stmts);
         group.bench_function(BenchmarkId::from_parameter(name), |b| {
-            b.iter_batched(
-                || locals.clone(),
-                |locals| {
-                    let mut interpreter = Interpreter::with_output(locals, Box::new(io::sink()));
-                    interpreter.interpret(&stmts).unwrap();
-                },
-                BatchSize::SmallInput,
-            )
+            b.iter(|| {
+                let mut interpreter = Interpreter::with_output(Box::new(io::sink()));
+                interpreter.interpret(&stmts).unwrap();
+            })
         });
     }
     group.finish();

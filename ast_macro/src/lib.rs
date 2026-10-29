@@ -79,7 +79,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let expanded = quote! {
         #visitor_trait
 
-        #[derive(Debug, PartialEq, Clone, Eq, Hash)]
+        #[derive(Debug, PartialEq, Clone)]
         pub enum #name #enum_lifetime_tokenstream {
             #(#enum_variants),*
         }

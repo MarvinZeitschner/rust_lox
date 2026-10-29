@@ -1,5 +1,7 @@
 pub mod error;
 
+use std::cell::Cell;
+
 use error::{ParserError, ParserErrorContext, TokenStreamError};
 
 use crate::{
@@ -154,6 +156,7 @@ impl<'a> Parser<'a> {
             )?;
             superclass = Some(Expr::Variable(ExprVariable::new(
                 self.tokenstream.previous()?,
+                Cell::new(None),
             )));
         }
 
@@ -466,7 +469,11 @@ impl<'a> Parser<'a> {
 
             if let Expr::Variable(var) = &expr {
                 let name = var.name;
-                return Ok(Expr::Assign(ExprAssign::new(name, Box::new(value))));
+                return Ok(Expr::Assign(ExprAssign::new(
+                    name,
+                    Box::new(value),
+                    Cell::new(None),
+                )));
             } else if let Expr::Get(get) = expr {
                 return Ok(Expr::Set(ExprSet::new(
                     get.object,
@@ -596,7 +603,7 @@ impl<'a> Parser<'a> {
                 )?;
                 return Ok(Expr::Grouping(ExprGrouping::new(Box::new(expr))));
             }
-            TokenType::This => Ok(Expr::This(ExprThis::new(token))),
+            TokenType::This => Ok(Expr::This(ExprThis::new(token, Cell::new(None)))),
             TokenType::Super => {
                 let keyword = self.tokenstream.previous()?;
                 self.tokenstream
@@ -605,9 +612,13 @@ impl<'a> Parser<'a> {
                     &TokenType::Ident,
                     ParserErrorContext::ExpectedSuperclassMethodName,
                 )?;
-                Ok(Expr::Super(ExprSuper::new(keyword, method)))
+                Ok(Expr::Super(ExprSuper::new(
+                    keyword,
+                    method,
+                    Cell::new(None),
+                )))
             }
-            TokenType::Ident => Ok(Expr::Variable(ExprVariable::new(token))),
+            TokenType::Ident => Ok(Expr::Variable(ExprVariable::new(token, Cell::new(None)))),
             _ => Err(ParserError::UnexpectedToken { token }),
         }
     }
@@ -644,7 +655,7 @@ mod test {
     use crate::lex::{Scanner, Span};
 
     use super::*;
-    fn setup(input: &str) -> Parser {
+    fn setup(input: &str) -> Parser<'_> {
         let mut lexer = Scanner::new(input);
         Parser::new(TokenStream::new(lexer.scan_tokens().unwrap()))
     }

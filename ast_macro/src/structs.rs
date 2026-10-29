@@ -20,11 +20,10 @@ pub fn struct_defs(
             let name = field.ident.as_ref().unwrap();
             let ty = &field.ty;
             let inner_ty = innermost_type(ty);
-            let lt = match extract_lifetime(inner_ty) {
-                Some(lt) => quote! { <#lt> },
-                None => quote! {},
-            };
-            *internal_lifetime.borrow_mut() = lt.clone();
+            // A field without a lifetime must not reset the lifetime found on another field
+            if let Some(lt) = extract_lifetime(inner_ty) {
+                *internal_lifetime.borrow_mut() = quote! { <#lt> };
+            }
             quote! { pub #name: #ty }
         })
         .collect::<Vec<_>>();
@@ -44,7 +43,7 @@ pub fn struct_defs(
     let lt = internal_lifetime.borrow().clone();
 
     quote! {
-        #[derive(Debug, PartialEq, Clone, Eq, Hash)]
+        #[derive(Debug, PartialEq, Clone)]
         pub struct #name #lt {
             #(#struct_fields),*
         }

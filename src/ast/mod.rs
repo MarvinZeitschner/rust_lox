@@ -1,7 +1,6 @@
 pub mod printer;
 
-use std::hash::Hash;
-use std::hash::Hasher;
+use std::cell::Cell;
 
 use ast_macro::Ast;
 
@@ -15,17 +14,8 @@ pub enum LiteralValue {
     Nil,
 }
 
-impl Hash for LiteralValue {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        core::mem::discriminant(self).hash(state);
-        if let LiteralValue::F64(n) = self {
-            n.to_bits().hash(state);
-        }
-    }
-}
-
-impl Eq for LiteralValue {}
-
+/// `depth` is filled in by the resolver: the number of environments between the use of a local
+/// variable and its declaration. `None` means the variable is global.
 #[derive(Ast, Debug, PartialEq)]
 #[name = "Expr"]
 pub enum Expression<'a> {
@@ -48,9 +38,11 @@ pub enum Expression<'a> {
     Super {
         keyword: Token<'a>,
         method: Token<'a>,
+        depth: Cell<Option<usize>>,
     },
     This {
         keyword: Token<'a>,
+        depth: Cell<Option<usize>>,
     },
     Unary {
         operator: Token<'a>,
@@ -73,9 +65,11 @@ pub enum Expression<'a> {
     Assign {
         name: Token<'a>,
         value: Box<Expr<'a>>,
+        depth: Cell<Option<usize>>,
     },
     Variable {
         name: Token<'a>,
+        depth: Cell<Option<usize>>,
     },
 }
 
