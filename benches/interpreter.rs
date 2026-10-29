@@ -38,8 +38,7 @@ fn parse(tokens: Vec<Token<'_>>) -> Vec<Stmt<'_>> {
     Parser::new(TokenStream::new(tokens)).parse().unwrap()
 }
 
-// The resolver requires the AST to be borrowed for as long as the source lives ('b: 'a)
-fn resolve<'a>(stmts: &'a [Stmt<'a>]) {
+fn resolve(stmts: &[Stmt<'_>]) {
     let mut resolver = Resolver::new();
     resolver.resolve(stmts).unwrap();
 }

@@ -45,9 +45,9 @@ pub struct LoxFunction<'a> {
     pub is_initializer: bool,
 }
 
-impl<'a: 'b, 'b> LoxFunction<'a> {
+impl<'a> LoxFunction<'a> {
     pub fn new(
-        declaration: &'a StmtFunction<'b>,
+        declaration: &'a StmtFunction<'a>,
         closure: Rc<RefCell<Environment<'a>>>,
         is_initializer: bool,
     ) -> Self {

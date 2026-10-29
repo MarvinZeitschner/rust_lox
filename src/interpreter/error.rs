@@ -40,9 +40,6 @@ pub enum RuntimeError<'a> {
     #[error("{0}")]
     ClassError(ClassError<'a>),
 
-    #[error("{0}")]
-    ResolverError(#[from] ResolverError<'static>),
-
     // Not an actual Error, but rather a special type to unwind the interpreter to the call method of LoxCallable when a value is returned
     #[error("Internal Error: Unhandled return.")]
     Return(Return<'a>),

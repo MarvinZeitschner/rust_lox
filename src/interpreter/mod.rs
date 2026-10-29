@@ -31,7 +31,7 @@ pub struct Interpreter<'a> {
     output: Box<dyn Write>,
 }
 
-impl<'a, 'b: 'a> Interpreter<'a> {
+impl<'a> Interpreter<'a> {
     /// Creates an interpreter that prints to stdout.
     pub fn new() -> Self {
         Self::with_output(Box::new(io::stdout()))
@@ -51,18 +51,28 @@ impl<'a, 'b: 'a> Interpreter<'a> {
         }
     }
 
-    pub fn interpret(&mut self, stmts: &'b [Stmt<'a>]) -> Result<(), RuntimeError<'a>> {
+    pub fn interpret(&mut self, stmts: &'a [Stmt<'a>]) -> Result<(), RuntimeError<'a>> {
         stmts.iter().try_for_each(|stmt| self.execute(stmt))?;
         Ok(())
     }
 
-    fn execute(&mut self, stmt: &'b Stmt<'a>) -> Result<(), RuntimeError<'a>> {
-        stmt.accept(self)
+    fn execute(&mut self, stmt: &'a Stmt<'a>) -> Result<(), RuntimeError<'a>> {
+        match stmt {
+            Stmt::Block(node) => self.visit_block(node),
+            Stmt::Class(node) => self.visit_class(node),
+            Stmt::Expression(node) => self.visit_expression(node),
+            Stmt::Function(node) => self.visit_function(node),
+            Stmt::If(node) => self.visit_if(node),
+            Stmt::Print(node) => self.visit_print(node),
+            Stmt::Return(node) => self.visit_return(node),
+            Stmt::Var(node) => self.visit_var(node),
+            Stmt::While(node) => self.visit_while(node),
+        }
     }
 
     fn execute_block(
         &mut self,
-        statements: &'b [Stmt<'a>],
+        statements: &'a [Stmt<'a>],
         environment: Environment<'a>,
     ) -> Result<(), RuntimeError<'a>> {
         // The block's environment is dropped once nothing references it anymore. Closures
@@ -77,7 +87,20 @@ impl<'a, 'b: 'a> Interpreter<'a> {
     }
 
     fn evaluate(&mut self, expr: &Expr<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
-        expr.accept(self)
+        match expr {
+            Expr::Literal(node) => self.visit_literal(node),
+            Expr::Grouping(node) => self.visit_grouping(node),
+            Expr::Logical(node) => self.visit_logical(node),
+            Expr::Set(node) => self.visit_set(node),
+            Expr::Super(node) => self.visit_super(node),
+            Expr::This(node) => self.visit_this(node),
+            Expr::Unary(node) => self.visit_unary(node),
+            Expr::Binary(node) => self.visit_binary(node),
+            Expr::Call(node) => self.visit_call(node),
+            Expr::Get(node) => self.visit_get(node),
+            Expr::Assign(node) => self.visit_assign(node),
+            Expr::Variable(node) => self.visit_variable(node),
+        }
     }
 
     fn check_number_operand(
@@ -116,18 +139,17 @@ impl<'a, 'b: 'a> Interpreter<'a> {
     }
 }
 
-impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
-    type Output = Result<Value<'a>, RuntimeError<'a>>;
-
-    fn visit_literal(&mut self, node: &ExprLiteral) -> Self::Output {
+/// Evaluation of the individual expression types, dispatched by `evaluate`
+impl<'a> Interpreter<'a> {
+    fn visit_literal(&mut self, node: &ExprLiteral) -> Result<Value<'a>, RuntimeError<'a>> {
         Ok(node.value.clone().into())
     }
 
-    fn visit_grouping(&mut self, node: &ExprGrouping<'a>) -> Self::Output {
+    fn visit_grouping(&mut self, node: &ExprGrouping<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
         self.evaluate(&node.value)
     }
 
-    fn visit_logical(&mut self, node: &ExprLogical<'a>) -> Self::Output {
+    fn visit_logical(&mut self, node: &ExprLogical<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
         let left = self.evaluate(&node.left)?;
 
         if (node.operator.kind == TokenType::Or && left.is_truthy())
@@ -139,7 +161,7 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
         self.evaluate(&node.right)
     }
 
-    fn visit_set(&mut self, node: &'b ExprSet<'a>) -> Self::Output {
+    fn visit_set(&mut self, node: &ExprSet<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
         let object = self.evaluate(&node.object)?;
 
         let Value::Instance(instance) = object else {
@@ -154,7 +176,7 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
         Ok(value)
     }
 
-    fn visit_super(&mut self, node: &'b ExprSuper<'a>) -> Self::Output {
+    fn visit_super(&mut self, node: &ExprSuper<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
         // `super` is always local to a method, so the resolver always sets the depth
         let distance = node.depth.get().expect("resolver sets the depth of 'super'");
 
@@ -191,12 +213,12 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
         Ok(Value::Callable(Rc::new(method.bind(object))))
     }
 
-    fn visit_this(&mut self, node: &'b ExprThis<'a>) -> Self::Output {
+    fn visit_this(&mut self, node: &ExprThis<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
         // TODO: Clone
         self.lookup_variable(node.keyword, node.depth.get())
     }
 
-    fn visit_unary(&mut self, node: &ExprUnary<'a>) -> Self::Output {
+    fn visit_unary(&mut self, node: &ExprUnary<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
         let operator = node.operator;
         let right = self.evaluate(&node.value)?;
 
@@ -210,7 +232,7 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
         }
     }
 
-    fn visit_binary(&mut self, node: &ExprBinary<'a>) -> Self::Output {
+    fn visit_binary(&mut self, node: &ExprBinary<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
         let operator = node.operator;
         let left = self.evaluate(&node.left)?;
         let right = self.evaluate(&node.right)?;
@@ -259,7 +281,7 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
         }
     }
 
-    fn visit_call(&mut self, node: &ExprCall<'a>) -> Self::Output {
+    fn visit_call(&mut self, node: &ExprCall<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
         let callee = self.evaluate(&node.callee)?;
 
         let arguments: VecDeque<Value<'a>> = node
@@ -283,7 +305,7 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
         function.call(self, arguments)
     }
 
-    fn visit_get(&mut self, node: &'b ExprGet<'a>) -> Self::Output {
+    fn visit_get(&mut self, node: &ExprGet<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
         let object = self.evaluate(&node.object)?;
 
         if let Value::Instance(instance) = object {
@@ -295,7 +317,7 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
         ))
     }
 
-    fn visit_assign(&mut self, node: &ExprAssign<'a>) -> Self::Output {
+    fn visit_assign(&mut self, node: &ExprAssign<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
         let value = self.evaluate(&node.value)?;
 
         match node.depth.get() {
@@ -310,15 +332,15 @@ impl<'a, 'b> ExprVisitor<'a, 'b> for Interpreter<'a> {
         Ok(value)
     }
 
-    fn visit_variable(&mut self, node: &ExprVariable<'a>) -> Self::Output {
+    fn visit_variable(&mut self, node: &ExprVariable<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
         self.lookup_variable(node.name, node.depth.get())
     }
 }
 
-impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
-    type Output = Result<(), RuntimeError<'a>>;
-
-    fn visit_block(&mut self, node: &'b StmtBlock<'a>) -> Self::Output {
+/// Execution of the individual statement types, dispatched by `execute`.
+/// Statements borrow the AST for `'a` because functions keep a reference to their declaration.
+impl<'a> Interpreter<'a> {
+    fn visit_block(&mut self, node: &'a StmtBlock<'a>) -> Result<(), RuntimeError<'a>> {
         self.execute_block(
             &node.statements,
             Environment::new(Some(self.environment.clone())),
@@ -326,7 +348,7 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
         Ok(())
     }
 
-    fn visit_class(&mut self, node: &'b StmtClass<'a>) -> Self::Output {
+    fn visit_class(&mut self, node: &'a StmtClass<'a>) -> Result<(), RuntimeError<'a>> {
         let mut superclass = None;
         let mut superclass_value = None;
         if let Some(sc) = &node.superclass {
@@ -378,12 +400,12 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
         Ok(())
     }
 
-    fn visit_expression(&mut self, node: &StmtExpression<'a>) -> Self::Output {
+    fn visit_expression(&mut self, node: &StmtExpression<'a>) -> Result<(), RuntimeError<'a>> {
         self.evaluate(&node.expr)?;
         Ok(())
     }
 
-    fn visit_function(&mut self, node: &'b StmtFunction<'a>) -> Self::Output {
+    fn visit_function(&mut self, node: &'a StmtFunction<'a>) -> Result<(), RuntimeError<'a>> {
         let function = LoxFunction::new(node, self.environment.clone(), false);
 
         self.environment
@@ -393,7 +415,7 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
         Ok(())
     }
 
-    fn visit_if(&mut self, node: &'b StmtIf<'a>) -> Self::Output {
+    fn visit_if(&mut self, node: &'a StmtIf<'a>) -> Result<(), RuntimeError<'a>> {
         let condition = self.evaluate(&node.condition)?;
         if condition.is_truthy() {
             self.execute(&node.then_branch)?;
@@ -404,13 +426,13 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
         Ok(())
     }
 
-    fn visit_print(&mut self, node: &StmtPrint<'a>) -> Self::Output {
+    fn visit_print(&mut self, node: &StmtPrint<'a>) -> Result<(), RuntimeError<'a>> {
         let value = self.evaluate(&node.expr)?;
         writeln!(self.output, "{}", value).map_err(|e| RuntimeError::Output(e.to_string()))?;
         Ok(())
     }
 
-    fn visit_return(&mut self, node: &'b StmtReturn<'a>) -> Self::Output {
+    fn visit_return(&mut self, node: &'a StmtReturn<'a>) -> Result<(), RuntimeError<'a>> {
         let mut value = Value::Nil;
 
         if node.value.is_some() {
@@ -420,7 +442,7 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
         Err(RuntimeError::Return(Return { value }))
     }
 
-    fn visit_var(&mut self, node: &StmtVar<'a>) -> Self::Output {
+    fn visit_var(&mut self, node: &StmtVar<'a>) -> Result<(), RuntimeError<'a>> {
         let mut value = None;
         if let Some(initializer) = &node.initializer {
             value = Some(self.evaluate(initializer)?);
@@ -429,7 +451,7 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Interpreter<'a> {
         Ok(())
     }
 
-    fn visit_while(&mut self, node: &'b StmtWhile<'a>) -> Self::Output {
+    fn visit_while(&mut self, node: &'a StmtWhile<'a>) -> Result<(), RuntimeError<'a>> {
         while self.evaluate(&node.condition)?.is_truthy() {
             self.execute(&node.body)?;
         }

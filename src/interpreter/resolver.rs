@@ -28,7 +28,7 @@ pub struct Resolver<'a> {
     current_class: ClassType,
 }
 
-impl<'a, 'b: 'a> Resolver<'a> {
+impl<'a> Resolver<'a> {
     pub fn new() -> Self {
         Self {
             scopes: vec![],
@@ -38,7 +38,7 @@ impl<'a, 'b: 'a> Resolver<'a> {
     }
 
     /// Resolves all statements and collects one error per failing top-level statement.
-    pub fn resolve(&mut self, stmts: &'b [Stmt<'a>]) -> Result<(), Vec<ResolverError<'a>>> {
+    pub fn resolve(&mut self, stmts: &[Stmt<'a>]) -> Result<(), Vec<ResolverError<'a>>> {
         let mut errors = vec![];
         for stmt in stmts {
             if let Err(err) = self.resolve_stmt(stmt) {
@@ -56,16 +56,39 @@ impl<'a, 'b: 'a> Resolver<'a> {
         }
     }
 
-    fn resolve_stmt(&mut self, stmt: &'b Stmt<'a>) -> Result<(), ResolverError<'a>> {
-        stmt.accept(self)
+    fn resolve_stmt(&mut self, stmt: &Stmt<'a>) -> Result<(), ResolverError<'a>> {
+        match stmt {
+            Stmt::Block(node) => self.visit_block(node),
+            Stmt::Class(node) => self.visit_class(node),
+            Stmt::Expression(node) => self.visit_expression(node),
+            Stmt::Function(node) => self.visit_function(node),
+            Stmt::If(node) => self.visit_if(node),
+            Stmt::Print(node) => self.visit_print(node),
+            Stmt::Return(node) => self.visit_return(node),
+            Stmt::Var(node) => self.visit_var(node),
+            Stmt::While(node) => self.visit_while(node),
+        }
     }
 
-    fn resolve_stmts(&mut self, stmts: &'b [Stmt<'a>]) -> Result<(), ResolverError<'a>> {
+    fn resolve_stmts(&mut self, stmts: &[Stmt<'a>]) -> Result<(), ResolverError<'a>> {
         stmts.iter().try_for_each(|stmt| self.resolve_stmt(stmt))
     }
 
-    fn resolve_expr(&mut self, expr: &'b Expr<'a>) -> Result<(), ResolverError<'a>> {
-        expr.accept(self)
+    fn resolve_expr(&mut self, expr: &Expr<'a>) -> Result<(), ResolverError<'a>> {
+        match expr {
+            Expr::Literal(node) => self.visit_literal(node),
+            Expr::Grouping(node) => self.visit_grouping(node),
+            Expr::Logical(node) => self.visit_logical(node),
+            Expr::Set(node) => self.visit_set(node),
+            Expr::Super(node) => self.visit_super(node),
+            Expr::This(node) => self.visit_this(node),
+            Expr::Unary(node) => self.visit_unary(node),
+            Expr::Binary(node) => self.visit_binary(node),
+            Expr::Call(node) => self.visit_call(node),
+            Expr::Get(node) => self.visit_get(node),
+            Expr::Assign(node) => self.visit_assign(node),
+            Expr::Variable(node) => self.visit_variable(node),
+        }
     }
 
     fn begin_scope(&mut self) {
@@ -116,7 +139,7 @@ impl<'a, 'b: 'a> Resolver<'a> {
 
     fn resolve_function(
         &mut self,
-        function: &'b StmtFunction<'a>,
+        function: &StmtFunction<'a>,
         fn_type: FunctionType,
     ) -> Result<(), ResolverError<'a>> {
         let enclosing_function = self.current_function;
@@ -139,31 +162,30 @@ impl<'a, 'b: 'a> Resolver<'a> {
     }
 }
 
-impl<'a, 'b: 'a> ExprVisitor<'a, 'b> for Resolver<'a> {
-    type Output = Result<(), ResolverError<'a>>;
-
-    fn visit_literal(&mut self, _node: &ExprLiteral) -> Self::Output {
+/// Resolution of the individual expression types, dispatched by `resolve_expr`
+impl<'a> Resolver<'a> {
+    fn visit_literal(&mut self, _node: &ExprLiteral) -> Result<(), ResolverError<'a>> {
         Ok(())
     }
 
-    fn visit_grouping(&mut self, node: &'b ExprGrouping<'a>) -> Self::Output {
+    fn visit_grouping(&mut self, node: &ExprGrouping<'a>) -> Result<(), ResolverError<'a>> {
         self.resolve_expr(&node.value)?;
         Ok(())
     }
 
-    fn visit_logical(&mut self, node: &'b ExprLogical<'a>) -> Self::Output {
+    fn visit_logical(&mut self, node: &ExprLogical<'a>) -> Result<(), ResolverError<'a>> {
         self.resolve_expr(&node.left)?;
         self.resolve_expr(&node.right)?;
         Ok(())
     }
 
-    fn visit_set(&mut self, node: &'b ExprSet<'a>) -> Self::Output {
+    fn visit_set(&mut self, node: &ExprSet<'a>) -> Result<(), ResolverError<'a>> {
         self.resolve_expr(&node.value)?;
         self.resolve_expr(&node.object)?;
         Ok(())
     }
 
-    fn visit_super(&mut self, node: &'b ExprSuper<'a>) -> Self::Output {
+    fn visit_super(&mut self, node: &ExprSuper<'a>) -> Result<(), ResolverError<'a>> {
         if self.current_class == ClassType::None {
             return Err(ResolverError::SuperOutsideClass {
                 token: node.keyword,
@@ -177,7 +199,7 @@ impl<'a, 'b: 'a> ExprVisitor<'a, 'b> for Resolver<'a> {
         Ok(())
     }
 
-    fn visit_this(&mut self, node: &'b ExprThis<'a>) -> Self::Output {
+    fn visit_this(&mut self, node: &ExprThis<'a>) -> Result<(), ResolverError<'a>> {
         if self.current_class == ClassType::None {
             return Err(ResolverError::ThisOutsideClass {
                 token: node.keyword,
@@ -188,36 +210,36 @@ impl<'a, 'b: 'a> ExprVisitor<'a, 'b> for Resolver<'a> {
         Ok(())
     }
 
-    fn visit_unary(&mut self, node: &'b ExprUnary<'a>) -> Self::Output {
+    fn visit_unary(&mut self, node: &ExprUnary<'a>) -> Result<(), ResolverError<'a>> {
         self.resolve_expr(&node.value)?;
         Ok(())
     }
 
-    fn visit_binary(&mut self, node: &'b ExprBinary<'a>) -> Self::Output {
+    fn visit_binary(&mut self, node: &ExprBinary<'a>) -> Result<(), ResolverError<'a>> {
         self.resolve_expr(&node.left)?;
         self.resolve_expr(&node.right)?;
         Ok(())
     }
 
-    fn visit_call(&mut self, node: &'b ExprCall<'a>) -> Self::Output {
+    fn visit_call(&mut self, node: &ExprCall<'a>) -> Result<(), ResolverError<'a>> {
         self.resolve_expr(&node.callee)?;
         node.arguments
             .iter()
             .try_for_each(|arg| self.resolve_expr(arg))
     }
 
-    fn visit_get(&mut self, node: &'b ExprGet<'a>) -> Self::Output {
+    fn visit_get(&mut self, node: &ExprGet<'a>) -> Result<(), ResolverError<'a>> {
         self.resolve_expr(&node.object)?;
         Ok(())
     }
 
-    fn visit_assign(&mut self, node: &'b ExprAssign<'a>) -> Self::Output {
+    fn visit_assign(&mut self, node: &ExprAssign<'a>) -> Result<(), ResolverError<'a>> {
         self.resolve_expr(&node.value)?;
         self.resolve_local(&node.depth, node.name);
         Ok(())
     }
 
-    fn visit_variable(&mut self, node: &'b ExprVariable<'a>) -> Self::Output {
+    fn visit_variable(&mut self, node: &ExprVariable<'a>) -> Result<(), ResolverError<'a>> {
         if !self.scopes.is_empty() {
             let scope = self.scopes.last().unwrap();
 
@@ -234,17 +256,16 @@ impl<'a, 'b: 'a> ExprVisitor<'a, 'b> for Resolver<'a> {
     }
 }
 
-impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
-    type Output = Result<(), ResolverError<'a>>;
-
-    fn visit_block(&mut self, node: &'b StmtBlock<'a>) -> Self::Output {
+/// Resolution of the individual statement types, dispatched by `resolve_stmt`
+impl<'a> Resolver<'a> {
+    fn visit_block(&mut self, node: &StmtBlock<'a>) -> Result<(), ResolverError<'a>> {
         self.begin_scope();
         self.resolve_stmts(&node.statements)?;
         self.end_scope();
         Ok(())
     }
 
-    fn visit_class(&mut self, node: &'b StmtClass<'a>) -> Self::Output {
+    fn visit_class(&mut self, node: &StmtClass<'a>) -> Result<(), ResolverError<'a>> {
         let enclosing_class = self.current_class;
         self.current_class = ClassType::Class;
         self.declare(&node.name)?;
@@ -292,11 +313,11 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
         Ok(())
     }
 
-    fn visit_expression(&mut self, node: &'b StmtExpression<'a>) -> Self::Output {
+    fn visit_expression(&mut self, node: &StmtExpression<'a>) -> Result<(), ResolverError<'a>> {
         self.resolve_expr(&node.expr)
     }
 
-    fn visit_function(&mut self, node: &'b StmtFunction<'a>) -> Self::Output {
+    fn visit_function(&mut self, node: &StmtFunction<'a>) -> Result<(), ResolverError<'a>> {
         self.declare(&node.name)?;
         self.define(&node.name);
 
@@ -304,7 +325,7 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
         Ok(())
     }
 
-    fn visit_if(&mut self, node: &'b StmtIf<'a>) -> Self::Output {
+    fn visit_if(&mut self, node: &StmtIf<'a>) -> Result<(), ResolverError<'a>> {
         self.resolve_expr(&node.condition)?;
         self.resolve_stmt(&node.then_branch)?;
         if let Some(else_branch) = &node.else_branch {
@@ -313,11 +334,11 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
         Ok(())
     }
 
-    fn visit_print(&mut self, node: &'b StmtPrint<'a>) -> Self::Output {
+    fn visit_print(&mut self, node: &StmtPrint<'a>) -> Result<(), ResolverError<'a>> {
         self.resolve_expr(&node.expr)
     }
 
-    fn visit_return(&mut self, node: &'b StmtReturn<'a>) -> Self::Output {
+    fn visit_return(&mut self, node: &StmtReturn<'a>) -> Result<(), ResolverError<'a>> {
         if self.current_function == FunctionType::None {
             return Err(ResolverError::TopLevelReturn {
                 token: node.keyword,
@@ -336,7 +357,7 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
         Ok(())
     }
 
-    fn visit_var(&mut self, node: &'b StmtVar<'a>) -> Self::Output {
+    fn visit_var(&mut self, node: &StmtVar<'a>) -> Result<(), ResolverError<'a>> {
         self.declare(&node.name)?;
         if let Some(expr) = &node.initializer {
             self.resolve_expr(expr)?;
@@ -345,7 +366,7 @@ impl<'a, 'b: 'a> StmtVisitor<'a, 'b> for Resolver<'a> {
         Ok(())
     }
 
-    fn visit_while(&mut self, node: &'b StmtWhile<'a>) -> Self::Output {
+    fn visit_while(&mut self, node: &StmtWhile<'a>) -> Result<(), ResolverError<'a>> {
         self.resolve_expr(&node.condition)?;
         self.resolve_stmt(&node.body)?;
         Ok(())
