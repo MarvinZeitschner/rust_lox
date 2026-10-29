@@ -1,0 +1,10 @@
+{
+  var a;
+  print a; // expect: nil
+}
+
+fun f() {
+  var b;
+  return b;
+}
+print f(); // expect: nil

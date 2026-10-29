@@ -1,0 +1,3 @@
+// The lexer keeps scanning after an invalid character and reports every one of them.
+var a = 1 | 2; // [line 2] Error: Unexpected character.
+var b = 3 # 4; // [line 3] Error: Unexpected character.

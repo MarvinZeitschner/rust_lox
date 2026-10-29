@@ -31,6 +31,12 @@ pub struct Interpreter<'a> {
     output: Box<dyn Write>,
 }
 
+impl<'a> Default for Interpreter<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'a> Interpreter<'a> {
     /// Creates an interpreter that prints to stdout.
     pub fn new() -> Self {
@@ -42,7 +48,7 @@ impl<'a> Interpreter<'a> {
         let globals = Rc::new(RefCell::new(Environment::new(None)));
         globals
             .borrow_mut()
-            .define("clock", Some(Value::Callable(Rc::new(Clock::new()))));
+            .define("clock", Value::Callable(Rc::new(Clock::new())));
 
         Interpreter {
             environment: globals.clone(),
@@ -368,9 +374,11 @@ impl<'a> Interpreter<'a> {
             };
         }
 
-        self.environment.borrow_mut().define(node.name.lexeme, None);
+        self.environment
+            .borrow_mut()
+            .define(node.name.lexeme, Value::Nil);
 
-        if node.superclass.is_some() {
+        if let Some(superclass_value) = superclass_value {
             let mut environment = Environment::new(Some(self.environment.clone()));
             environment.define("super", superclass_value);
             self.environment = Rc::new(RefCell::new(environment));
@@ -410,7 +418,7 @@ impl<'a> Interpreter<'a> {
 
         self.environment
             .borrow_mut()
-            .define(node.name.lexeme, Some(Value::Callable(Rc::new(function))));
+            .define(node.name.lexeme, Value::Callable(Rc::new(function)));
 
         Ok(())
     }
@@ -433,20 +441,20 @@ impl<'a> Interpreter<'a> {
     }
 
     fn visit_return(&mut self, node: &'a StmtReturn<'a>) -> Result<(), RuntimeError<'a>> {
-        let mut value = Value::Nil;
-
-        if node.value.is_some() {
-            value = self.evaluate(node.value.as_ref().unwrap())?;
-        }
+        let value = match &node.value {
+            Some(expr) => self.evaluate(expr)?,
+            None => Value::Nil,
+        };
 
         Err(RuntimeError::Return(Return { value }))
     }
 
     fn visit_var(&mut self, node: &StmtVar<'a>) -> Result<(), RuntimeError<'a>> {
-        let mut value = None;
-        if let Some(initializer) = &node.initializer {
-            value = Some(self.evaluate(initializer)?);
-        }
+        // `var a;` without an initializer is the same as `var a = nil;`
+        let value = match &node.initializer {
+            Some(initializer) => self.evaluate(initializer)?,
+            None => Value::Nil,
+        };
         self.environment.borrow_mut().define(node.name.lexeme, value);
         Ok(())
     }

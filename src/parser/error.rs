@@ -67,6 +67,9 @@ pub enum ParserError<'a> {
     #[error("[line {}] Error: Invalid assignment target.", token.line)]
     InvalidAssignmentTarget { token: Token<'a> },
 
+    #[error("[line {}] Error: Expected variable name.", token.line)]
+    ExpectedVariableName { token: Token<'a> },
+
     #[error("[line {}] Error: Can't have more than 255 arguments.", token.line)]
     TooManyFunctionArguments { token: Token<'a> },
 
@@ -124,6 +127,7 @@ impl<'a> ParserErrorContext {
             ParserErrorContext::InvalidAssignmentTarget => {
                 ParserError::InvalidAssignmentTarget { token }
             }
+            ParserErrorContext::ExpectedVariableName => ParserError::ExpectedVariableName { token },
             ParserErrorContext::ExpectedRightBrace => ParserError::ExpectedRightBrace { token },
             ParserErrorContext::TokenStream => {
                 ParserError::TokenStream(TokenStreamError::OutOfBounds)

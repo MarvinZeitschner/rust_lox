@@ -85,59 +85,61 @@ impl<'a> TokenStream<'a> {
 
 pub struct Parser<'a> {
     tokenstream: TokenStream<'a>,
-    had_error: bool,
+    errors: Vec<ParserError<'a>>,
 }
 
 impl<'a> Parser<'a> {
     pub fn new(tokenstream: TokenStream<'a>) -> Self {
         Self {
             tokenstream,
-            had_error: false,
+            errors: vec![],
         }
     }
 
-    /// Whether an error was reported that didn't abort parsing (e.g. too many parameters).
-    pub fn had_error(&self) -> bool {
-        self.had_error
-    }
-
+    /// Records an error that doesn't abort parsing (e.g. too many parameters).
     fn report(&mut self, err: ParserError<'a>) {
-        eprintln!("{}", err);
-        self.had_error = true;
+        self.errors.push(err);
     }
 
-    pub fn parse(&mut self) -> Result<Vec<Stmt<'a>>, ParserError<'a>> {
+    /// Parses the whole program. An error doesn't stop parsing: it is recorded, the parser skips
+    /// to the next statement and continues, so all syntax errors are reported at once.
+    pub fn parse(&mut self) -> Result<Vec<Stmt<'a>>, Vec<ParserError<'a>>> {
         let mut statements = vec![];
         while !self.tokenstream.is_at_end() {
-            statements.push(self.declaration()?);
+            if let Some(stmt) = self.declaration_or_recover() {
+                statements.push(stmt);
+            }
         }
-        Ok(statements)
+
+        match self.errors.is_empty() {
+            true => Ok(statements),
+            false => Err(std::mem::take(&mut self.errors)),
+        }
     }
 
-    fn try_with_sync<T, F>(&mut self, f: F) -> Result<T, ParserError<'a>>
-    where
-        F: FnOnce(&mut Self) -> Result<T, ParserError<'a>>,
-    {
-        match f(self) {
-            Ok(res) => Ok(res),
-            Err(e) => {
-                self.synchronize()?;
-                Err(e)
+    /// Parses a declaration. On an error, records it and skips to the start of the next statement.
+    fn declaration_or_recover(&mut self) -> Option<Stmt<'a>> {
+        match self.declaration() {
+            Ok(stmt) => Some(stmt),
+            Err(err) => {
+                self.errors.push(err);
+                self.synchronize();
+                None
             }
         }
     }
 
     fn declaration(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
         if self.tokenstream.match_l(&[TokenType::Var])? {
-            return self.try_with_sync(|s| s.var_declaration());
+            return self.var_declaration();
         }
 
         if self.tokenstream.match_l(&[TokenType::Class])? {
-            return self.try_with_sync(|s| s.class_declaration());
+            return self.class_declaration();
         }
 
         if self.tokenstream.match_l(&[TokenType::Fun])? {
-            return self.try_with_sync(|s| s.function(ParserErrorContext::ExpectedFunctionName));
+            return self.function(ParserErrorContext::ExpectedFunctionName);
         }
 
         self.statement()
@@ -186,7 +188,7 @@ impl<'a> Parser<'a> {
     fn var_declaration(&mut self) -> Result<Stmt<'a>, ParserError<'a>> {
         let name = self.tokenstream.consume(
             &TokenType::Ident,
-            ParserErrorContext::InvalidAssignmentTarget,
+            ParserErrorContext::ExpectedVariableName,
         )?;
         let mut initializer = None;
         if self.tokenstream.match_l(&[TokenType::Equal])? {
@@ -244,7 +246,9 @@ impl<'a> Parser<'a> {
         let mut statements = vec![];
 
         while !self.tokenstream.check(&TokenType::RightBrace)? && !self.tokenstream.is_at_end() {
-            statements.push(self.declaration()?);
+            if let Some(stmt) = self.declaration_or_recover() {
+                statements.push(stmt);
+            }
         }
 
         self.tokenstream.consume(
@@ -601,7 +605,7 @@ impl<'a> Parser<'a> {
                     &TokenType::RightParen,
                     ParserErrorContext::UnmatchedParanthesis,
                 )?;
-                return Ok(Expr::Grouping(ExprGrouping::new(Box::new(expr))));
+                Ok(Expr::Grouping(ExprGrouping::new(Box::new(expr))))
             }
             TokenType::This => Ok(Expr::This(ExprThis::new(token, Cell::new(None)))),
             TokenType::Super => {
@@ -623,30 +627,39 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn synchronize(&mut self) -> Result<(), ParserError<'a>> {
-        self.tokenstream.advance()?;
+    /// Skips tokens until the start of the next statement: right after a `;` or in front of a
+    /// keyword that begins a statement.
+    fn synchronize(&mut self) {
+        // `advance` and `previous` only fail at the very start of the stream
+        if self.tokenstream.advance().is_err() {
+            return;
+        }
 
         while !self.tokenstream.is_at_end() {
-            if self.tokenstream.previous()?.kind == TokenType::Semicolon {
-                return Ok(());
+            if let Ok(previous) = self.tokenstream.previous() {
+                if previous.kind == TokenType::Semicolon {
+                    return;
+                }
             }
 
-            match self.tokenstream.peek()?.kind {
-                TokenType::Class => (),
-                TokenType::Fun => (),
-                TokenType::Var => (),
-                TokenType::For => (),
-                TokenType::If => (),
-                TokenType::While => (),
-                TokenType::Print => (),
-                TokenType::Return => (),
-                _ => {
-                    self.tokenstream.advance()?;
-                    return Ok(());
+            if let Ok(next) = self.tokenstream.peek() {
+                match next.kind {
+                    TokenType::Class
+                    | TokenType::Fun
+                    | TokenType::Var
+                    | TokenType::For
+                    | TokenType::If
+                    | TokenType::While
+                    | TokenType::Print
+                    | TokenType::Return => return,
+                    _ => (),
                 }
-            };
+            }
+
+            if self.tokenstream.advance().is_err() {
+                return;
+            }
         }
-        Ok(())
     }
 }
 
@@ -672,22 +685,21 @@ mod test {
 
     #[test]
     fn recursive_descent() {
-        let input = "2 + 3";
+        let input = "2 + 3;";
         let mut parser = setup(input);
 
-        if let Ok(stmts) = parser.parse() {
-            let left = Expr::Literal(ExprLiteral::new(LiteralValue::F64(2.0)));
+        let stmts = parser.parse().unwrap();
+        let left = Expr::Literal(ExprLiteral::new(LiteralValue::F64(2.0)));
 
-            let span = Span { begin: 2, end: 3 };
-            let operator = Token::new(TokenType::Plus, "+", 1, span);
+        let span = Span { begin: 2, end: 3 };
+        let operator = Token::new(TokenType::Plus, "+", 1, span);
 
-            let right = Expr::Literal(ExprLiteral::new(LiteralValue::F64(3.0)));
-            let stmt = vec![Stmt::Expression(StmtExpression::new(Expr::Binary(
-                ExprBinary::new(Box::new(left), operator, Box::new(right)),
-            )))];
+        let right = Expr::Literal(ExprLiteral::new(LiteralValue::F64(3.0)));
+        let stmt = vec![Stmt::Expression(StmtExpression::new(Expr::Binary(
+            ExprBinary::new(Box::new(left), operator, Box::new(right)),
+        )))];
 
-            assert_eq!(stmt, stmts);
-        }
+        assert_eq!(stmt, stmts);
     }
 
     #[test]
@@ -695,11 +707,10 @@ mod test {
         let input = "(1 + 1";
         let mut parser = setup(input);
 
-        if let Err(expr) = parser.parse() {
-            let span = Span { begin: 5, end: 6 };
-            let right = Token::new(TokenType::Number(1.0), "1", 1, span);
+        let errors = parser.parse().unwrap_err();
+        let span = Span { begin: 5, end: 6 };
+        let right = Token::new(TokenType::Number(1.0), "1", 1, span);
 
-            assert_eq!(expr, ParserError::UnmatchedParanthesis { token: right });
-        }
+        assert_eq!(errors, vec![ParserError::UnmatchedParanthesis { token: right }]);
     }
 }

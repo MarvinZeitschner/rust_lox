@@ -59,7 +59,7 @@ impl<'a> LoxFunction<'a> {
     }
     pub fn bind(&self, instance: Rc<RefCell<LoxInstance<'a>>>) -> Self {
         let mut environment = Environment::new(Some(self.closure.clone()));
-        environment.define("this", Some(Value::Instance(instance)));
+        environment.define("this", Value::Instance(instance));
         Self {
             declaration: self.declaration,
             closure: Rc::new(RefCell::new(environment)),
@@ -84,7 +84,7 @@ impl<'a> LoxFunction<'a> {
 
             let argument = arguments.pop_front().ok_or(CallableError::InternalError)?;
 
-            environment.define(lexeme, Some(argument));
+            environment.define(lexeme, argument);
         }
 
         match interpreter.execute_block(&self.declaration.body, environment) {

@@ -16,26 +16,23 @@ struct Args {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
-    let binding = fs::read_to_string(&args.path)?;
-    let contents = binding.trim();
+    let contents = fs::read_to_string(&args.path)?;
 
-    let mut lexer = Scanner::new(contents);
+    let mut lexer = Scanner::new(&contents);
     let tokens = lexer.scan_tokens();
     let tokens = match tokens {
         Ok(t) => t,
-        Err(e) => {
-            eprintln!("{e:#}");
+        Err(errors) => {
+            errors.iter().for_each(|e| eprintln!("{e:#}"));
             std::process::exit(65);
         }
     };
 
     let mut parser = parser::Parser::new(TokenStream::new(tokens));
-    let stmts = parser.parse();
-    let stmts = match stmts {
-        Ok(s) if !parser.had_error() => s,
-        Ok(_) => std::process::exit(65),
-        Err(e) => {
-            eprintln!("{e:#}");
+    let stmts = match parser.parse() {
+        Ok(s) => s,
+        Err(errors) => {
+            errors.iter().for_each(|e| eprintln!("{e:#}"));
             std::process::exit(65);
         }
     };

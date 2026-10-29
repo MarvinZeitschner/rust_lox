@@ -9,13 +9,14 @@ use crate::ast::LiteralValue;
 use super::{callable::LoxCallable, class::LoxInstance};
 use std::ops::{Add, Div, Mul, Neg, Not, Sub};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum Value<'a> {
     Number(f64),
     String(String),
     Boolean(bool),
     Callable(Rc<dyn LoxCallable<'a>>),
     Instance(Rc<RefCell<LoxInstance<'a>>>),
+    #[default]
     Nil,
 }
 
@@ -32,11 +33,6 @@ impl<'a> Value<'a> {
     }
 }
 
-impl<'a> Default for Value<'a> {
-    fn default() -> Self {
-        Self::Nil
-    }
-}
 
 impl<'a> Neg for Value<'a> {
     type Output = Self;

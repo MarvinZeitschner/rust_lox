@@ -144,15 +144,27 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    pub fn scan_tokens(&mut self) -> Result<Vec<Token<'a>>, TokenError> {
+    /// Scans the whole source. An invalid character doesn't stop scanning, so all errors are
+    /// reported at once. The tokens always end with exactly one `EOF`.
+    pub fn scan_tokens(&mut self) -> Result<Vec<Token<'a>>, Vec<TokenError>> {
         let mut tokens = vec![];
-        while self.position < self.source.len() {
-            self.start = self.position;
-            let token = self.scan_token()?;
-            tokens.push(token);
+        let mut errors = vec![];
+
+        loop {
+            match self.scan_token() {
+                Ok(token) if token.kind == TokenType::EOF => {
+                    tokens.push(token);
+                    break;
+                }
+                Ok(token) => tokens.push(token),
+                Err(err) => errors.push(err),
+            }
         }
-        tokens.push(self.make_token(TokenType::EOF));
-        Ok(tokens)
+
+        match errors.is_empty() {
+            true => Ok(tokens),
+            false => Err(errors),
+        }
     }
 
     fn peek(&self) -> Option<char> {
@@ -508,15 +520,42 @@ mod test {
         let input = "1234.123 123";
         let mut scanner = Scanner::new(input);
 
-        let tokens = scanner.scan_tokens();
+        let tokens = scanner.scan_tokens().unwrap();
 
-        if let Ok(tokens) = tokens {
-            let mut span = Span { begin: 0, end: 8 };
-            let mut token = Token::new(TokenType::Number(1234.123), "1234.123", 1, span);
-            assert_eq!(token, tokens[0]);
-            span = Span { begin: 9, end: 12 };
-            token = Token::new(TokenType::Number(123.0), "123", 1, span);
-            assert_eq!(token, tokens[1]);
-        }
+        let mut span = Span { begin: 0, end: 8 };
+        let mut token = Token::new(TokenType::Number(1234.123), "1234.123", 1, span);
+        assert_eq!(token, tokens[0]);
+        span = Span { begin: 9, end: 12 };
+        token = Token::new(TokenType::Number(123.0), "123", 1, span);
+        assert_eq!(token, tokens[1]);
+    }
+
+    #[test]
+    fn single_eof_after_trailing_whitespace_and_comment() {
+        let mut scanner = Scanner::new("1 // comment\n  \n");
+        let tokens = scanner.scan_tokens().unwrap();
+
+        let kinds: Vec<TokenType> = tokens.iter().map(|t| t.kind).collect();
+        assert_eq!(kinds, vec![TokenType::Number(1.0), TokenType::EOF]);
+    }
+
+    #[test]
+    fn collects_all_errors() {
+        let mut scanner = Scanner::new("| 1\n#");
+        let errors = scanner.scan_tokens().unwrap_err();
+
+        assert_eq!(
+            errors,
+            vec![
+                TokenError::UnexpectedToken {
+                    line: 1,
+                    token: "|".to_string()
+                },
+                TokenError::UnexpectedToken {
+                    line: 2,
+                    token: "#".to_string()
+                },
+            ]
+        );
     }
 }

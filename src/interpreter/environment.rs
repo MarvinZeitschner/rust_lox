@@ -6,7 +6,7 @@ use super::{error::RuntimeError, Value};
 
 #[derive(Clone, Debug)]
 pub struct Environment<'a> {
-    values: HashMap<&'a str, Option<Value<'a>>>,
+    values: HashMap<&'a str, Value<'a>>,
     pub enclosing: Option<Rc<RefCell<Environment<'a>>>>,
 }
 
@@ -18,16 +18,13 @@ impl<'a> Environment<'a> {
         }
     }
 
-    pub fn define(&mut self, name: &'a str, value: Option<Value<'a>>) {
+    pub fn define(&mut self, name: &'a str, value: Value<'a>) {
         self.values.insert(name, value);
     }
 
     pub fn get(&self, name: Token<'a>) -> Result<Value<'a>, RuntimeError<'a>> {
         match self.values.get(name.lexeme) {
-            Some(value) => match value {
-                Some(value) => Ok(value.clone()),
-                None => Ok(Value::Nil),
-            },
+            Some(value) => Ok(value.clone()),
             None => match &self.enclosing {
                 Some(enclosing) => enclosing.borrow().get(name),
                 _ => Err(RuntimeError::UndefinedVariable { name }),
@@ -36,13 +33,12 @@ impl<'a> Environment<'a> {
     }
 
     pub fn get_at(&self, distance: usize, name: &'a str) -> Value<'a> {
-        // The Resolver already found the variable before, so we know it's there
+        // The resolver already found the variable at this depth, so it is guaranteed to exist
         let get = |env: &Environment<'a>| {
             env.values
                 .get(name)
-                .expect("AAAA")
+                .expect("resolver and environments disagree about a variable")
                 .clone()
-                .expect("BBBB")
         };
 
         match distance {
@@ -53,11 +49,11 @@ impl<'a> Environment<'a> {
 
     pub fn assign_at(&mut self, distance: usize, name: Token<'a>, value: Value<'a>) {
         match distance {
-            0 => self.define(name.lexeme, Some(value)),
+            0 => self.define(name.lexeme, value),
             _ => self
                 .ancestor(distance)
                 .borrow_mut()
-                .define(name.lexeme, Some(value)),
+                .define(name.lexeme, value),
         }
     }
 
@@ -74,7 +70,7 @@ impl<'a> Environment<'a> {
     pub fn assign(&mut self, name: Token<'a>, value: Value<'a>) -> Result<(), RuntimeError<'a>> {
         match self.values.get_mut(name.lexeme) {
             Some(v) => {
-                *v = Some(value);
+                *v = value;
                 Ok(())
             }
             None => match &self.enclosing {

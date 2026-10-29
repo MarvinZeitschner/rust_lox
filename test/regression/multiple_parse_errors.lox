@@ -1,0 +1,9 @@
+// The parser recovers after each error and reports all of them, also inside blocks.
+var = 1; // Error at '=': Expect variable name.
+print "valid";
+var = 3; // Error at '=': Expect variable name.
+{
+  print = 4; // Error at '=': Expect expression.
+  print "still in block";
+}
+print "after block";
